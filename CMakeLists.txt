@@ -31,3 +31,6 @@ target_include_directories(cds_server PRIVATE headers third_party)
 # )
 # target_include_directories(cds_cli PRIVATE headers third_party)
 
+if(WIN32)
+    target_link_libraries(cds_server ws2_32)
+endif()
