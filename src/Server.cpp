@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <mutex>
 
 // NOTE: This server uses the single-header cpp-httplib library.
 // Download it from: https://github.com/yhirose/cpp-httplib (place httplib.h in a folder named third_party)
@@ -49,26 +50,36 @@ static double extractNumber(const string &body, const string &key, double defaul
 int serverMain() {
     httplib::Server svr;
     CancerDiagnosisSystem system;
+    // All handlers share one system object; cpp-httplib runs handlers on a thread pool
+    std::mutex systemMutex;
 
-    svr.Get("/status", [&](const httplib::Request& req, httplib::Response& res) {
-        std::ostringstream ss;
-        ss << "{\"modelsTrained\":" << (system.areModelsTrained() ? "true" : "false")
-           << ",\"geneticCount\":" << system.getGeneticDataCount()
-           << ",\"patientCount\":" << system.getPatientCount() << "}";
-        res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
+    // Add CORS header to ALL responses (including errors)
+    svr.set_post_routing_handler([](const httplib::Request& req, httplib::Response& res) {
+        if (!res.has_header("Access-Control-Allow-Origin")) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+        }
     });
 
-    // CORS preflight for /status
-    svr.Options("/status", [&](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
+    // CORS preflight for every route
+    svr.Options(R"(.*)", [&](const httplib::Request& req, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Headers", "Content-Type");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         res.set_content("", "text/plain");
     });
 
+    svr.Get("/status", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        std::ostringstream ss;
+        ss << "{\"modelsTrained\":" << (system.areModelsTrained() ? "true" : "false")
+           << ",\"geneticCount\":" << system.getGeneticDataCount()
+           << ",\"patientCount\":" << system.getPatientCount() << "}";
+        res.set_content(ss.str(), "application/json");
+    });
+
+
     // POST /load {"genesFile":"data/genes.csv","patientsFile":"data/patients.csv"}
     svr.Post("/load", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
         string body = req.body;
         // naive JSON parsing (just extract values)
         auto extract = [&](const string &key)->string {
@@ -103,19 +114,12 @@ int serverMain() {
            << ",\"geneticCount\":" << system.getGeneticDataCount()
            << ",\"patientCount\":" << system.getPatientCount() << "}";
         res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
     });
 
-    // CORS preflight for /load
-    svr.Options("/load", [&](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_content("", "text/plain");
-    });
 
     // POST /patients  { "patient_id":"P011","name":"Alice","age":30, "geneticRecords":[{"geneId":"GENE_010","mutationScore":0.45,"label":0}, ...] }
     svr.Post("/patients", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
         string body = req.body;
         auto extract = [&](const string &key)->string {
             size_t p = body.find(key);
@@ -225,128 +229,45 @@ int serverMain() {
         ss << "{\"success\":true,\"patientCount\":" << system.getPatientCount()
            << ",\"geneticCount\":" << system.getGeneticDataCount() << ",\"message\":\"Patient added and data auto-saved to CSV\"}";
         res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
-    });
-
-    // CORS preflight for /patients
-    svr.Options("/patients", [&](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_content("", "text/plain");
     });
 
     svr.Get("/patients", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
         std::ostringstream ss;
         ss << "[";
         bool first = true;
-
-        // iterate patients via displayPatientHistory would print; instead replicate traversal
-        // We rely on getPatientCount() and getPatientById for access; but getPatientById requires id.
-        // To extract patients, we will capture patient IDs by reading patients file again would be complex.
-        // Simpler: provide a light-weight approach by calling displayPatientHistory into a stringstream? Not available.
-        // Instead, use the public interface: iterate patient IDs  by invoking getPatientCount and trying common ids isn't possible.
-        // As a pragmatic approach, we'll expose patients through storing them when loading data. Modify system to provide a getter would be better,
-        // but to keep changes minimal we will call displayPatientHistory and parse the output. This is a hack but works for now.
-
-        // Capture output of displayPatientHistory
-        std::ostringstream capture;
-        // Temporarily redirect cout
-        auto cout_buf = std::cout.rdbuf();
-        std::cout.rdbuf(capture.rdbuf());
-        system.displayPatientHistory();
-        std::cout.rdbuf(cout_buf);
-
-        string out = capture.str();
-        // Parse lines looking for "Patient ID:" lines from Patient::display()
-        // Patient::display prints fields; to keep parsing simple, we look for lines with "Patient ID:" etc.
-        std::istringstream iss(out);
-        string line;
-        string id, name;
-        int age = 0;
-        while (std::getline(iss, line)) {
-            // trim
-            auto trim = [](string s){ size_t a = s.find_first_not_of(" \t\r\n"); if (a==string::npos) return string(); s = s.substr(a); size_t b = s.find_last_not_of(" \t\r\n"); if (b!=string::npos) s = s.substr(0,b+1); return s; };
-            line = trim(line);
-            if (line.rfind("Patient ID:", 0) == 0) {
-                id = trim(line.substr(11));
-            } else if (line.rfind("Name:", 0) == 0) {
-                name = trim(line.substr(5));
-            } else if (line.rfind("Age:", 0) == 0) {
-                string agestr = trim(line.substr(4));
-                try { age = stoi(agestr); } catch(...) { age = 0; }
-                if (!id.empty()) {
-                    if (!first) ss << ",";
-                    ss << "{\"patient_id\":\"" << json_escape(id) << "\",\"name\":\"" << json_escape(name) << "\",\"age\":" << age << "}";
-                    first = false;
-                    id.clear(); name.clear(); age = 0;
-                }
-            }
+        for (const auto& p : system.getAllPatients()) {
+            if (!first) ss << ",";
+            ss << "{\"patient_id\":\"" << json_escape(p.getPatientId())
+               << "\",\"name\":\"" << json_escape(p.getName())
+               << "\",\"age\":" << p.getAge()
+               << ",\"riskScore\":" << p.getRiskScore()
+               << ",\"prediction\":" << p.getPrediction() << "}";
+            first = false;
         }
-
         ss << "]";
         res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
-    });
-
-    // CORS preflight for /patients
-    svr.Options("/patients", [&](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_content("", "text/plain");
     });
 
     svr.Get(R"(/genetic)", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
         std::ostringstream ss;
         ss << "[";
         bool first = true;
-        
-        // Similar hack: capture displayGeneticData output and parse
-        std::ostringstream capture;
-        auto cout_buf = std::cout.rdbuf();
-        std::cout.rdbuf(capture.rdbuf());
-        system.displayGeneticData();
-        std::cout.rdbuf(cout_buf);
-
-        string out = capture.str();
-        // Look for lines like: Gene ID: ...
-        istringstream iss(out);
-        string line;
-        string gid; double score=0; int label=0;
-        while (getline(iss, line)) {
-            auto trim = [](string s){ size_t a = s.find_first_not_of(" \t\r\n"); if (a==string::npos) return string(); s = s.substr(a); size_t b = s.find_last_not_of(" \t\r\n"); if (b!=string::npos) s = s.substr(0,b+1); return s; };
-            line = trim(line);
-            if (line.rfind("Gene ID:", 0) == 0) {
-                gid = trim(line.substr(8));
-            } else if (line.rfind("Mutation Score:", 0) == 0) {
-                string s = trim(line.substr(15)); try { score = stod(s); } catch(...) { score = 0; }
-            } else if (line.rfind("Label:", 0) == 0) {
-                string s = trim(line.substr(6)); try { label = stoi(s); } catch(...) { label = 0; }
-                if (!gid.empty()) {
-                    if (!first) ss << ",";
-                    ss << "{\"gene_id\":\"" << json_escape(gid) << "\",\"mutation_score\":" << score << ",\"label\":" << label << "}";
-                    first = false;
-                    gid.clear(); score = 0; label = 0;
-                }
-            }
+        for (const auto& g : system.getAllGeneticData()) {
+            if (!first) ss << ",";
+            ss << "{\"gene_id\":\"" << json_escape(g.getGeneId())
+               << "\",\"mutation_score\":" << g.getMutationScore()
+               << ",\"label\":" << g.getLabel() << "}";
+            first = false;
         }
-
         ss << "]";
         res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
-    });
-
-    // CORS preflight for /genetic
-    svr.Options("/genetic", [&](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_content("", "text/plain");
     });
 
     // GET /diagnose?patient_id=P001&model=logistic
     svr.Get(R"(/diagnose)", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
         auto params = req.params;
         string pid;
         string modelStr = "logistic";
@@ -378,19 +299,12 @@ int serverMain() {
         std::ostringstream ss;
         ss << "{\"patient_id\":\"" << json_escape(patient.getPatientId()) << "\",\"riskScore\":" << risk << ",\"prediction\":" << pred << "}";
         res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
     });
 
-    // CORS preflight for /diagnose
-    svr.Options("/diagnose", [&](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_content("", "text/plain");
-    });
 
     // GET /queue -> { queueSize: N, patients: ["P1","P2"] }
     svr.Get("/queue", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
         std::ostringstream ss;
         auto ids = system.getQueuedPatientIds();
         ss << "{";
@@ -402,18 +316,12 @@ int serverMain() {
         }
         ss << "]}";
         res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
     });
 
-    svr.Options("/queue", [&](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_content("", "text/plain");
-    });
 
     // POST /queue { "patient_id":"P001" } -> schedule patient for testing
     svr.Post("/queue", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
         string body = req.body;
         auto extract = [&](const string &key)->string {
             size_t p = body.find(key);
@@ -449,12 +357,12 @@ int serverMain() {
         std::ostringstream ss;
         ss << "{\"success\":true,\"queueSize\":" << system.getQueueSize() << ",\"message\":\"Patient scheduled for diagnosis\"}";
         res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
     });
 
     // POST /queue/process -> processes all queued patients with optional model selection
     // Body: { "model": "logistic" } or empty for default (logistic)
     svr.Post("/queue/process", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
         string body = req.body;
         
         // Extract model from request body
@@ -488,7 +396,7 @@ int serverMain() {
 
         // Build JSON array of results
         std::ostringstream ss;
-        ss << "{\"model\":\"" << modelStr << "\",\"processed\":" << results.size() 
+        ss << "{\"model\":\"" << json_escape(modelStr) << "\",\"processed\":" << results.size() 
            << ",\"results\":[";
         for (size_t i = 0; i < results.size(); ++i) {
             if (i) ss << ",";
@@ -497,15 +405,8 @@ int serverMain() {
         ss << "],\"patientCount\":" << system.getPatientCount()
            << ",\"geneticCount\":" << system.getGeneticDataCount() << "}";
         res.set_content(ss.str(), "application/json");
-        res.set_header("Access-Control-Allow-Origin", "*");
     });
 
-    svr.Options("/queue/process", [&](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_content("", "text/plain");
-    });
 
     std::cout << "Starting server on http://localhost:8080 ..." << std::endl;
         std::cout.flush();

@@ -6,6 +6,24 @@
 #include <iomanip>
 #include <map>
 
+// Helper: escape JSON string
+static std::string json_escape(const std::string &s) {
+    std::string out;
+    for (char c : s) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                out.push_back(c);
+        }
+    }
+    return out;
+}
 
 CancerDiagnosisSystem::CancerDiagnosisSystem() 
     : patientHistoryHead(nullptr), modelsTrained(false) {
@@ -326,8 +344,8 @@ std::vector<std::string> CancerDiagnosisSystem::processTestQueueWithModel(ModelT
 
         // Build JSON-like result string for this patient
         std::ostringstream result;
-        result << "{\"patient_id\":\"" << patient.getPatientId() 
-               << "\",\"name\":\"" << patient.getName()
+        result << "{\"patient_id\":\"" << json_escape(patient.getPatientId()) 
+               << "\",\"name\":\"" << json_escape(patient.getName())
                << "\",\"riskScore\":" << std::fixed << std::setprecision(4) << riskScore
                << ",\"prediction\":" << prediction
                << ",\"status\":\"processed\"}"; 
