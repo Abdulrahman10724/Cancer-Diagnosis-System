@@ -24,8 +24,21 @@ struct PatientNode
 {
     Patient patient;
     std::shared_ptr<PatientNode> next;
+    
+    PatientNode(const Patient& p) : patient(p), next(nullptr) {}
+};
 
-    PatientNode(const Patient &p) : patient(p), next(nullptr) {}
+/**
+ * @struct ModelEvaluation
+ * @brief Evaluation metrics of one model on held-out test data
+ */
+struct ModelEvaluation {
+    std::string key;
+    std::string name;
+    double accuracy;
+    double precision;
+    double recall;
+    double f1;
 };
 
 /**
@@ -59,9 +72,10 @@ private:
     bool modelsTrained;
 
     // Helper functions
-    void loadGeneticDataFromFile(const std::string &filename);
-    void loadPatientsFromFile(const std::string &filename);
-    void addPatientToHistory(const Patient &patient);
+    void loadGeneticDataFromFile(const std::string& filename);
+    void loadPatientsFromFile(const std::string& filename, const std::string& patientGenesFile);
+    void addPatientToHistory(const Patient& patient);
+    void updateOrAddPatientInHistory(const Patient& patient);
     void prepareTrainingData();
     void trainAllModels();
     std::vector<double> extractFeatures(const Patient &patient) const;
@@ -75,14 +89,19 @@ public:
         NAIVE_BAYES
     };
 
+    enum class ModelType { LOGISTIC, KNN, DECISION_TREE, NAIVE_BAYES };
+
     CancerDiagnosisSystem();
     ~CancerDiagnosisSystem();
 
     // Data acquisition
-    void loadData(const std::string &genesFile, const std::string &patientsFile);
-    void addPatient(const Patient &patient);
-    void addGeneticData(const GeneticData &data);
-
+    void loadData(const std::string& genesFile, const std::string& patientsFile,
+                  const std::string& patientGenesFile = "data/patient_genes.csv");
+    void addPatient(const Patient& patient);
+    void addGeneticData(const GeneticData& data);
+    // Re-run preprocessing and training on the current genetic data
+    void retrainModels();
+    
     // Test scheduling
     void scheduleTest(const Patient &patient);
     void processTestQueue();
@@ -95,14 +114,18 @@ public:
     std::vector<std::string> getQueuedPatientIds() const;
 
     // Diagnosis
-    double diagnosePatient(const Patient &patient, ModelType model);
-    int predictPatient(const Patient &patient, ModelType model);
-
+    double diagnosePatient(const Patient& patient, ModelType model);
+    int predictPatient(const Patient& patient, ModelType model);
+    
     // Evaluation
-    void evaluateModels(const std::vector<Patient> &testPatients);
-    void displayModelMetrics(ModelType model, const std::vector<int> &yTrue,
-                             const std::vector<int> &yPred) const;
-
+    void evaluateModels(const std::vector<Patient>& testPatients);
+    // Train temporary models on a stratified 80/20 hold-out split (fixed seed)
+    // and return metrics on the 20% test part. Returns false if no data/models.
+    bool evaluateModelsHoldout(std::vector<ModelEvaluation>& results, size_t& testSamples,
+                               double testRatio = 0.2, unsigned int seed = 42) const;
+    void displayModelMetrics(ModelType model, const std::vector<int>& yTrue, 
+                            const std::vector<int>& yPred) const;
+    
     // Display
     void displayGeneticData() const;
     void displayPatientHistory() const;
@@ -118,7 +141,8 @@ public:
     // Data export
     std::vector<Patient> getAllPatients() const;
     std::vector<GeneticData> getAllGeneticData() const;
-    void saveDataToFiles(const std::string &genesFile, const std::string &patientsFile) const;
+    void saveDataToFiles(const std::string& genesFile, const std::string& patientsFile,
+                         const std::string& patientGenesFile = "data/patient_genes.csv") const;
 };
 
 #endif // CANCER_DIAGNOSIS_SYSTEM_H

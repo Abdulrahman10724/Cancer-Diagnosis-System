@@ -108,8 +108,8 @@ void LogisticRegressionModel::fit(const std::vector<std::vector<double>>& X,
         }
     }
     
-    // Initialize weights
-    weights.resize(nFeatures, 0.0);
+    // Initialize weights (reset so retraining starts fresh)
+    weights.assign(nFeatures, 0.0);
     bias = 0.0;
     
     // Train using gradient descent

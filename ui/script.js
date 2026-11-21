@@ -605,7 +605,7 @@ async function processQueueFromUI() {
             let html = '<div class="results-grid">';
             results.forEach((resultJson, idx) => {
                 try {
-                    const result = JSON.parse(resultJson);
+                    const result = typeof resultJson === 'string' ? JSON.parse(resultJson) : resultJson;
                     const predictionClass = result.prediction === 1 ? 'prediction-cancerous' : 'prediction-safe';
                     const predictionText = result.prediction === 1 ? 'CANCEROUS ⚠️' : 'NON-CANCEROUS ✓';
                     html += `
@@ -685,44 +685,27 @@ function loadMutationMappings() {
     }, 800);
 }
 
-// Evaluate All Models
-function evaluateAllModels() {
+// Evaluate All Models (real metrics from the server's held-out test split)
+async function evaluateAllModels() {
     const container = document.getElementById('evaluation-results');
     container.innerHTML = '<div class="status-message info show">Evaluating all models...</div>';
 
-    setTimeout(() => {
-        const models = [
-            {
-                name: 'Logistic Regression',
-                accuracy: 0.87,
-                precision: 0.85,
-                recall: 0.89,
-                f1: 0.87
-            },
-            {
-                name: 'K-Nearest Neighbors',
-                accuracy: 0.84,
-                precision: 0.82,
-                recall: 0.86,
-                f1: 0.84
-            },
-            {
-                name: 'Decision Tree',
-                accuracy: 0.92,
-                precision: 0.90,
-                recall: 0.94,
-                f1: 0.92
-            },
-            {
-                name: 'Naive Bayes',
-                accuracy: 0.79,
-                precision: 0.77,
-                recall: 0.81,
-                f1: 0.79
-            }
-        ];
+    try {
+        const resp = await fetch(systemState.apiEndpoint + '/evaluate');
+        let data = null;
+        try { data = await resp.json(); } catch (e) { data = null; }
 
-        let html = '';
+        if (!resp.ok) {
+            const msg = (data && data.error) ? data.error : ('Server error: ' + resp.status);
+            throw new Error(msg);
+        }
+        if (!data || !Array.isArray(data.models)) {
+            throw new Error('Invalid response from server');
+        }
+
+        const models = data.models;
+
+        let html = `<div class="status-message info show">Tested on ${data.testSamples} samples (held-out 20% of genetic data)</div>`;
         models.forEach(model => {
             html += `
                 <div class="model-result">
@@ -802,7 +785,9 @@ function evaluateAllModels() {
                 });
             }
         }, 100);
-    }, 1500);
+    } catch (error) {
+        container.innerHTML = `<div class="status-message error show">Evaluation failed: ${error.message}. Make sure the C++ server is running and data is loaded.</div>`;
+    }
 }
 
 // Update Dashboard
@@ -1301,7 +1286,8 @@ function initCharts() {
             data: {
                 labels: ['Logistic Regression', 'K-Nearest Neighbors', 'Decision Tree', 'Naive Bayes'],
                 datasets: [{
-                    data: [87, 84, 92, 79],
+                    // Filled with real accuracies after "Evaluate Models"
+                    data: [0, 0, 0, 0],
                     backgroundColor: [
                         '#0066cc',
                         '#00aaff',

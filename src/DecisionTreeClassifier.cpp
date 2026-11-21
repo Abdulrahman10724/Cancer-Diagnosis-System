@@ -115,6 +115,15 @@ std::shared_ptr<TreeNode> DecisionTreeClassifier::buildTree(
     
     auto node = std::make_shared<TreeNode>();
     
+    // Store fraction of positive samples (used as probability at leaf nodes)
+    if (!y.empty()) {
+        int positives = 0;
+        for (int label : y) {
+            if (label == 1) positives++;
+        }
+        node->positiveFraction = static_cast<double>(positives) / y.size();
+    }
+    
     // Stopping conditions
     if (depth >= maxDepth || static_cast<int>(y.size()) < minSamplesSplit) {
         node->prediction = getMajorityClass(y);
@@ -202,6 +211,25 @@ int DecisionTreeClassifier::predictSample(const std::vector<double>& sample,
     }
 }
 
+double DecisionTreeClassifier::predictSampleProbability(const std::vector<double>& sample, 
+                                                      std::shared_ptr<TreeNode> node) const {
+    if (!node) {
+        return 0.0;
+    }
+    
+    // If leaf node, return fraction of positive samples
+    if (node->featureIndex == -1) {
+        return node->positiveFraction;
+    }
+    
+    // Traverse tree
+    if (sample[node->featureIndex] <= node->threshold) {
+        return predictSampleProbability(sample, node->left);
+    } else {
+        return predictSampleProbability(sample, node->right);
+    }
+}
+
 std::vector<int> DecisionTreeClassifier::predict(
     const std::vector<std::vector<double>>& X) const {
     if (!root) {
@@ -224,6 +252,14 @@ int DecisionTreeClassifier::predictSingle(const std::vector<double>& sample) con
     }
     
     return predictSample(sample, root);
+}
+
+double DecisionTreeClassifier::predictProbabilitySingle(const std::vector<double>& sample) const {
+    if (!root) {
+        throw std::runtime_error("Model not trained. Call fit() first.");
+    }
+    
+    return predictSampleProbability(sample, root);
 }
 
 void DecisionTreeClassifier::setMaxDepth(int depth) {

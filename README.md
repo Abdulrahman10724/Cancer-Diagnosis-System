@@ -127,7 +127,7 @@ The **Cancer Diagnosis System** is a comprehensive, full-stack application that 
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Muhammad-Hashir-Code/Cancer-Diagnosis-System.git
+   git clone https://github.com/Abdulrahman10724/Cancer-Diagnosis-System.git
    cd Cancer-Diagnosis-System
    ```
 
@@ -146,10 +146,19 @@ The **Cancer Diagnosis System** is a comprehensive, full-stack application that 
    cmake --build . --config Release
    ```
 
+   **Windows with MinGW (MSYS2):**
+   ```bash
+   mkdir build && cd build
+   cmake .. -G "MinGW Makefiles"
+   cmake --build .
+   # Executable: build\cds_server.exe
+   ```
+
 3. **Run the server**
    ```bash
    # From project root directory
-   ./build/Release/cds_server.exe  # Windows
+   ./build/Release/cds_server.exe  # Windows (Visual Studio)
+   .\build\cds_server.exe          # Windows (MinGW)
    ./build/cds_server               # Linux/macOS
    ```
 
@@ -202,6 +211,7 @@ CancerDiagnosisSystem/
 ├── data/                      # CSV data files
 │   ├── genes.csv             # Genetic mutation data
 │   ├── patients.csv          # Patient information
+│   ├── patient_genes.csv     # Which genes belong to which patient
 │   └── test_*.csv            # Test datasets
 ├── headers/                   # C++ header files
 │   ├── CancerDiagnosisSystem.h
@@ -298,23 +308,27 @@ Run diagnosis on patient data.
 }
 ```
 
-#### `POST /evaluate`
-Evaluate all models and return metrics.
+#### `GET /evaluate`
+Evaluate all 4 models on held-out data. The loaded genetic data is split into
+80% train / 20% test (stratified by label, fixed random seed, so results are
+reproducible). Temporary copies of the models are trained on the 80% and the
+metrics are computed on the 20% they did not see. The models used by
+`/diagnose` stay trained on the full data.
 
 **Response:**
 ```json
 {
-  "decision_tree": {
-    "accuracy": 0.92,
-    "precision": 0.89,
-    "recall": 0.91,
-    "f1Score": 0.90
-  },
-  "knn": { ... },
-  "logistic_regression": { ... },
-  "naive_bayes": { ... }
+  "testSamples": 6,
+  "models": [
+    {"key":"logistic","name":"Logistic Regression","accuracy":1.0,"precision":1.0,"recall":1.0,"f1":1.0},
+    {"key":"knn","name":"K-Nearest Neighbors","accuracy":1.0,"precision":1.0,"recall":1.0,"f1":1.0},
+    {"key":"decision_tree","name":"Decision Tree","accuracy":1.0,"precision":1.0,"recall":1.0,"f1":1.0},
+    {"key":"naive_bayes","name":"Naive Bayes","accuracy":0.8333,"precision":1.0,"recall":0.6667,"f1":0.8}
+  ]
 }
 ```
+
+If no data is loaded: HTTP 400 `{"error":"Load data first"}`.
 
 ## 🤖 Machine Learning Models
 
@@ -357,6 +371,16 @@ GENE_003,0.45,0
 Patient_ID,Name,Age
 P001,John Doe,45
 P002,Jane Smith,52
+```
+
+### patient_genes.csv
+Links each patient to its own genes (by `Gene_ID` from `genes.csv`). It is written
+automatically whenever the server saves data. If the file does not exist, each
+patient is given 5 consecutive genes from `genes.csv` as a fallback.
+```csv
+Patient_ID,Gene_ID
+P001,GENE_001
+P001,GENE_002
 ```
 
 ## 🎨 Screenshots

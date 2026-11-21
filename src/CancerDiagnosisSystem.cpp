@@ -4,7 +4,28 @@
 #include <iostream>
 #include <algorithm>
 #include <iomanip>
+#include <map>
+#include <random>
+#include <cmath>
 
+// Helper: escape JSON string
+static std::string json_escape(const std::string &s) {
+    std::string out;
+    for (char c : s) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                out.push_back(c);
+        }
+    }
+    return out;
+}
 
 CancerDiagnosisSystem::CancerDiagnosisSystem() 
     : patientHistoryHead(nullptr), modelsTrained(false) {
@@ -72,11 +93,37 @@ void CancerDiagnosisSystem::loadGeneticDataFromFile(const std::string& filename)
     std::cout << "Loaded " << geneticDataArray.size() << " genetic data records." << std::endl;
 }
 
-void CancerDiagnosisSystem::loadPatientsFromFile(const std::string& filename) {
+void CancerDiagnosisSystem::loadPatientsFromFile(const std::string& filename,
+                                                 const std::string& patientGenesFile) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << std::endl;
         return;
+    }
+    
+    // Load patient -> gene links (Patient_ID,Gene_ID) if the file exists
+    std::map<std::string, std::vector<std::string>> patientGeneIds;
+    bool hasPatientGenes = false;
+    std::ifstream pgFile(patientGenesFile);
+    if (pgFile.is_open()) {
+        hasPatientGenes = true;
+        std::string pgLine;
+        bool pgHeader = true;
+        while (std::getline(pgFile, pgLine)) {
+            if (pgHeader) { pgHeader = false; continue; }
+            if (!pgLine.empty() && pgLine.back() == '\r') pgLine.pop_back();
+            if (pgLine.empty()) continue;
+            size_t comma = pgLine.find(',');
+            if (comma == std::string::npos) continue;
+            patientGeneIds[pgLine.substr(0, comma)].push_back(pgLine.substr(comma + 1));
+        }
+        pgFile.close();
+    }
+    
+    // Gene lookup by ID (first record wins if a Gene_ID appears more than once)
+    std::map<std::string, GeneticData> geneById;
+    for (const auto& data : geneticDataArray) {
+        geneById.emplace(data.getGeneId(), data);
     }
     
     std::string line;
@@ -102,9 +149,20 @@ void CancerDiagnosisSystem::loadPatientsFromFile(const std::string& filename) {
                 int age = std::stoi(ageStr);
                 Patient patient(patientId, name, age);
                 
-                // Add a subset of genetic data to each patient (not all genes)
-                // This ensures each patient has unique genetic profiles for different predictions
-                if (!geneticDataArray.empty()) {
+                if (hasPatientGenes) {
+                    // Attach the patient's own genes saved in patient_genes.csv
+                    auto it = patientGeneIds.find(patientId);
+                    if (it != patientGeneIds.end()) {
+                        for (const auto& geneId : it->second) {
+                            auto g = geneById.find(geneId);
+                            if (g != geneById.end()) {
+                                patient.addGeneticData(g->second);
+                            }
+                        }
+                    }
+                } else if (!geneticDataArray.empty()) {
+                    // Fallback (no patient_genes.csv): add a subset of genetic data to each patient
+                    // This ensures each patient has unique genetic profiles for different predictions
                     size_t dataStart = patientIndex % geneticDataArray.size();
                     size_t dataCount = std::min(static_cast<size_t>(5), geneticDataArray.size()); // Each patient gets ~5 genes
                     
@@ -126,7 +184,8 @@ void CancerDiagnosisSystem::loadPatientsFromFile(const std::string& filename) {
 }
 
 void CancerDiagnosisSystem::loadData(const std::string& genesFile, 
-                                     const std::string& patientsFile) {
+                                     const std::string& patientsFile,
+                                     const std::string& patientGenesFile) {
     std::cout << "\n=== Loading Data ===" << std::endl;
 
     // Clear existing in-memory data to avoid duplication when loading multiple times
@@ -144,7 +203,7 @@ void CancerDiagnosisSystem::loadData(const std::string& genesFile,
     modelsTrained = false;
 
     loadGeneticDataFromFile(genesFile);
-    loadPatientsFromFile(patientsFile);
+    loadPatientsFromFile(patientsFile, patientGenesFile);
     
     std::cout << "\n=== Data Summary ===" << std::endl;
     std::cout << "Genetic records loaded: " << geneticDataArray.size() << std::endl;
@@ -178,9 +237,28 @@ void CancerDiagnosisSystem::addPatientToHistory(const Patient& patient) {
     patientHistoryHead = newNode;
 }
 
+void CancerDiagnosisSystem::updateOrAddPatientInHistory(const Patient& patient) {
+    // Update the existing node for this patient instead of adding a duplicate
+    auto current = patientHistoryHead;
+    while (current) {
+        if (current->patient.getPatientId() == patient.getPatientId()) {
+            current->patient.setRiskScore(patient.getRiskScore());
+            current->patient.setPrediction(patient.getPrediction());
+            return;
+        }
+        current = current->next;
+    }
+    addPatientToHistory(patient);
+}
+
 void CancerDiagnosisSystem::addGeneticData(const GeneticData& data) {
     geneticDataArray.push_back(data);
     mutationMapper.addMutationMapping(data.getGeneId(), data.getMutationScore());
+}
+
+void CancerDiagnosisSystem::retrainModels() {
+    prepareTrainingData();
+    trainAllModels();
 }
 
 void CancerDiagnosisSystem::scheduleTest(const Patient& patient) {
@@ -200,7 +278,7 @@ void CancerDiagnosisSystem::processTestQueue() {
         patient.setRiskScore(riskScore);
         patient.setPrediction(riskScore >= 0.5 ? 1 : 0);
         
-        addPatientToHistory(patient);
+        updateOrAddPatientInHistory(patient);
         count++;
         
         std::cout << "Processed patient: " << patient.getName() 
@@ -223,7 +301,7 @@ int CancerDiagnosisSystem::processTestQueueAndReturnCount() {
         patient.setRiskScore(riskScore);
         patient.setPrediction(riskScore >= 0.5 ? 1 : 0);
 
-        addPatientToHistory(patient);
+        updateOrAddPatientInHistory(patient);
         count++;
 
         std::cout << "Processed patient: " << patient.getName()
@@ -263,13 +341,13 @@ std::vector<std::string> CancerDiagnosisSystem::processTestQueueWithModel(ModelT
         patient.setRiskScore(riskScore);
         patient.setPrediction(prediction);
 
-        addPatientToHistory(patient);
+        updateOrAddPatientInHistory(patient);
         count++;
 
         // Build JSON-like result string for this patient
         std::ostringstream result;
-        result << "{\"patient_id\":\"" << patient.getPatientId() 
-               << "\",\"name\":\"" << patient.getName()
+        result << "{\"patient_id\":\"" << json_escape(patient.getPatientId()) 
+               << "\",\"name\":\"" << json_escape(patient.getName())
                << "\",\"riskScore\":" << std::fixed << std::setprecision(4) << riskScore
                << ",\"prediction\":" << prediction
                << ",\"status\":\"processed\"}"; 
@@ -420,10 +498,8 @@ double CancerDiagnosisSystem::diagnosePatient(const Patient& patient, ModelType 
             return probs[0];
         }
         case ModelType::DECISION_TREE: {
-            std::vector<int> predictions = decisionTreeModel->predict(X);
-            // Decision tree doesn't provide probabilities directly
-            // Return 1.0 if prediction is 1, 0.0 otherwise
-            return predictions[0] == 1 ? 1.0 : 0.0;
+            // Fraction of positive training samples in the reached leaf
+            return decisionTreeModel->predictProbabilitySingle(features);
         }
         case ModelType::NAIVE_BAYES: {
             double prob = naiveBayesModel->predictProbabilitySingle(features);
@@ -485,6 +561,102 @@ void CancerDiagnosisSystem::evaluateModels(const std::vector<Patient>& testPatie
     evaluator.displayMetrics(y_test, y_pred_nb);
     
     std::cout << "=====================\n" << std::endl;
+}
+
+bool CancerDiagnosisSystem::evaluateModelsHoldout(std::vector<ModelEvaluation>& results,
+                                                  size_t& testSamples,
+                                                  double testRatio,
+                                                  unsigned int seed) const {
+    results.clear();
+    testSamples = 0;
+    if (!modelsTrained || geneticDataArray.empty()) {
+        return false;
+    }
+    
+    // Group sample indices by label (stratified split)
+    std::map<int, std::vector<size_t>> indicesByLabel;
+    for (size_t i = 0; i < geneticDataArray.size(); ++i) {
+        indicesByLabel[geneticDataArray[i].getLabel()].push_back(i);
+    }
+    
+    // Shuffle each group with a fixed seed (manual Fisher-Yates so results
+    // are the same on every compiler/platform) and take testRatio of it as test data
+    std::mt19937 rng(seed);
+    std::vector<size_t> trainIdx, testIdx;
+    for (auto& group : indicesByLabel) {
+        std::vector<size_t>& idx = group.second;
+        for (size_t i = idx.size(); i > 1; --i) {
+            size_t j = rng() % i;
+            std::swap(idx[i - 1], idx[j]);
+        }
+        size_t nTest = static_cast<size_t>(std::round(idx.size() * testRatio));
+        if (nTest == 0 && idx.size() >= 2) nTest = 1;
+        for (size_t i = 0; i < idx.size(); ++i) {
+            if (i < nTest) testIdx.push_back(idx[i]);
+            else trainIdx.push_back(idx[i]);
+        }
+    }
+    
+    if (trainIdx.empty() || testIdx.empty()) {
+        return false;
+    }
+    
+    // Fit preprocessing on training part only (no information from test data)
+    std::vector<double> trainScores, testScores;
+    std::vector<int> yTrain, yTest;
+    for (size_t i : trainIdx) {
+        trainScores.push_back(geneticDataArray[i].getMutationScore());
+        yTrain.push_back(geneticDataArray[i].getLabel());
+    }
+    for (size_t i : testIdx) {
+        testScores.push_back(geneticDataArray[i].getMutationScore());
+        yTest.push_back(geneticDataArray[i].getLabel());
+    }
+    DataPreprocessor evalPreprocessor;
+    evalPreprocessor.fit(trainScores);
+    std::vector<double> trainNorm = evalPreprocessor.standardize(trainScores);
+    std::vector<double> testNorm = evalPreprocessor.standardize(testScores);
+    
+    std::vector<std::vector<double>> XTrain, XTest;
+    for (double v : trainNorm) XTrain.push_back({v});
+    for (double v : testNorm) XTest.push_back({v});
+    
+    // Temporary models with the same settings as the main models
+    LogisticRegressionModel evalLogistic(0.01, 1000);
+    KNNClassifier evalKnn(5);
+    DecisionTreeClassifier evalTree(10, 2);
+    NaiveBayesClassifier evalBayes;
+    
+    try {
+        evalLogistic.fit(XTrain, yTrain);
+        evalKnn.fit(XTrain, yTrain);
+        evalTree.fit(XTrain, yTrain);
+        evalBayes.fit(XTrain, yTrain);
+        
+        auto addResult = [&](const std::string& key, const std::string& name,
+                             const std::vector<int>& yPred) {
+            ModelEvaluation e;
+            e.key = key;
+            e.name = name;
+            e.accuracy = evaluator.accuracy(yTest, yPred);
+            e.precision = evaluator.precision(yTest, yPred);
+            e.recall = evaluator.recall(yTest, yPred);
+            e.f1 = evaluator.f1Score(yTest, yPred);
+            results.push_back(e);
+        };
+        
+        addResult("logistic", "Logistic Regression", evalLogistic.predict(XTest));
+        addResult("knn", "K-Nearest Neighbors", evalKnn.predict(XTest));
+        addResult("decision_tree", "Decision Tree", evalTree.predict(XTest));
+        addResult("naive_bayes", "Naive Bayes", evalBayes.predict(XTest));
+    } catch (const std::exception& e) {
+        std::cerr << "Error during evaluation: " << e.what() << std::endl;
+        results.clear();
+        return false;
+    }
+    
+    testSamples = testIdx.size();
+    return true;
 }
 
 void CancerDiagnosisSystem::displayModelMetrics(ModelType model, 
@@ -580,7 +752,8 @@ std::vector<GeneticData> CancerDiagnosisSystem::getAllGeneticData() const {
     return geneticDataArray;
 }
 
-void CancerDiagnosisSystem::saveDataToFiles(const std::string& genesFile, const std::string& patientsFile) const {
+void CancerDiagnosisSystem::saveDataToFiles(const std::string& genesFile, const std::string& patientsFile,
+                                            const std::string& patientGenesFile) const {
     // Save genetic data to genes file
     std::ofstream genesOut(genesFile);
     if (genesOut.is_open()) {
@@ -613,5 +786,25 @@ void CancerDiagnosisSystem::saveDataToFiles(const std::string& genesFile, const 
         std::cout << "✓ Saved " << count << " patient records to " << patientsFile << std::endl;
     } else {
         std::cerr << "✗ Error: Could not open " << patientsFile << " for writing" << std::endl;
+    }
+    
+    // Save patient -> gene links so each patient keeps its own genes after restart
+    std::ofstream patientGenesOut(patientGenesFile);
+    if (patientGenesOut.is_open()) {
+        patientGenesOut << "Patient_ID,Gene_ID\n";
+        auto current = patientHistoryHead;
+        int count = 0;
+        while (current) {
+            for (const auto& data : current->patient.getGeneticData()) {
+                patientGenesOut << current->patient.getPatientId() << ","
+                                << data.getGeneId() << "\n";
+                count++;
+            }
+            current = current->next;
+        }
+        patientGenesOut.close();
+        std::cout << "✓ Saved " << count << " patient-gene links to " << patientGenesFile << std::endl;
+    } else {
+        std::cerr << "✗ Error: Could not open " << patientGenesFile << " for writing" << std::endl;
     }
 }
