@@ -89,7 +89,6 @@ public:
         NAIVE_BAYES
     };
 
-    enum class ModelType { LOGISTIC, KNN, DECISION_TREE, NAIVE_BAYES };
 
     CancerDiagnosisSystem();
     ~CancerDiagnosisSystem();
