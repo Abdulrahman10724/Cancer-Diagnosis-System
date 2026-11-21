@@ -1,17 +1,21 @@
 ## Build artifacts
-CancerDiagnosisSystem/build/
+build/
+cmake-build-*/
 *.exe
+*.o
 *.obj
 *.pdb
+*.ilk
 *.tlog
 *.lastbuildstate
 
 ## CMake generated files
-CancerDiagnosisSystem/CMakeFiles/
-CancerDiagnosisSystem/CMakeCache.txt
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
 
-## IDE/Editor settings (common)
+## IDE/Editor settings
 .vs/
 .vscode/
 .idea/
-

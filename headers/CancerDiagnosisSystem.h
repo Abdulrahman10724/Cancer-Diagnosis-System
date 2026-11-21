@@ -65,6 +65,8 @@ private:
     std::vector<double> extractFeatures(const Patient& patient) const;
     
 public:
+    enum class ModelType { LOGISTIC, KNN, DECISION_TREE, NAIVE_BAYES };
+
     CancerDiagnosisSystem();
     ~CancerDiagnosisSystem();
     
@@ -85,7 +87,6 @@ public:
     std::vector<std::string> getQueuedPatientIds() const;
     
     // Diagnosis
-    enum class ModelType { LOGISTIC, KNN, DECISION_TREE, NAIVE_BAYES };
     double diagnosePatient(const Patient& patient, ModelType model);
     int predictPatient(const Patient& patient, ModelType model);
     
