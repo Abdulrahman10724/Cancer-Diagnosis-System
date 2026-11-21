@@ -23,8 +23,8 @@ Before you begin, ensure you have the following installed:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/Muhammad-Hashir-Code/Cancer-Diagnosis-System.git
-cd Cancer-Diagnosis-System/CancerDiagnosisSystem
+git clone https://github.com/Abdulrahman10724/Cancer-Diagnosis-System.git
+cd Cancer-Diagnosis-System
 ```
 
 ### Step 2: Build the Server
@@ -47,6 +47,18 @@ cmake --build . --config Release
 # Return to project root
 cd ..
 ```
+
+#### Windows with MinGW (MSYS2):
+
+```bash
+mkdir build
+cd build
+cmake .. -G "MinGW Makefiles"
+cmake --build .
+cd ..
+```
+
+The executable is created at `build\cds_server.exe`.
 
 #### Linux/macOS:
 
@@ -73,7 +85,8 @@ cd ..
 
 ```powershell
 # From project root directory
-.\build\Release\cds_server.exe
+.\build\Release\cds_server.exe   # Visual Studio build
+.\build\cds_server.exe           # MinGW build
 ```
 
 #### Linux/macOS:
@@ -129,6 +142,7 @@ CancerDiagnosisSystem/
 ├── data/                      # Data files (CSV format)
 │   ├── genes.csv             # Genetic mutation data
 │   ├── patients.csv          # Patient information
+│   ├── patient_genes.csv     # Which genes belong to which patient
 │   ├── test_genes.csv        # Test dataset
 │   └── test_patients.csv     # Test dataset
 ├── headers/                   # C++ header files
@@ -278,6 +292,24 @@ P003,Mike Johnson,38
 - `Name`: Patient name
 - `Age`: Patient age (numeric)
 
+### patient_genes.csv Format
+
+```csv
+Patient_ID,Gene_ID
+P001,GENE_001
+P001,GENE_002
+```
+
+- Links each patient to its own genes (`Gene_ID` from `genes.csv`)
+- Written automatically by the server whenever data is saved
+- If the file is missing, each patient gets 5 consecutive genes from `genes.csv` (fallback)
+
+### API: Model Evaluation
+
+`GET http://localhost:8080/evaluate` returns accuracy, precision, recall and F1 for all 4 models,
+measured on a held-out 20% of the genetic data (stratified, fixed seed). Load data first,
+otherwise the server returns HTTP 400 `{"error":"Load data first"}`.
+
 ## 🧪 Testing the Setup
 
 ### Test 1: Server Status
@@ -327,7 +359,7 @@ If successful, you'll see a success message in the console.
 
 - **CMake Documentation**: https://cmake.org/documentation/
 - **cpp-httplib Library**: https://github.com/yhirose/cpp-httplib
-- **Project Repository**: https://github.com/Muhammad-Hashir-Code/Cancer-Diagnosis-System
+- **Project Repository**: https://github.com/Abdulrahman10724/Cancer-Diagnosis-System
 
 ## 💡 Features
 
