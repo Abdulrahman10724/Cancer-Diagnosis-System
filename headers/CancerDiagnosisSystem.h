@@ -58,8 +58,9 @@ private:
     
     // Helper functions
     void loadGeneticDataFromFile(const std::string& filename);
-    void loadPatientsFromFile(const std::string& filename);
+    void loadPatientsFromFile(const std::string& filename, const std::string& patientGenesFile);
     void addPatientToHistory(const Patient& patient);
+    void updateOrAddPatientInHistory(const Patient& patient);
     void prepareTrainingData();
     void trainAllModels();
     std::vector<double> extractFeatures(const Patient& patient) const;
@@ -71,9 +72,12 @@ public:
     ~CancerDiagnosisSystem();
     
     // Data acquisition
-    void loadData(const std::string& genesFile, const std::string& patientsFile);
+    void loadData(const std::string& genesFile, const std::string& patientsFile,
+                  const std::string& patientGenesFile = "data/patient_genes.csv");
     void addPatient(const Patient& patient);
     void addGeneticData(const GeneticData& data);
+    // Re-run preprocessing and training on the current genetic data
+    void retrainModels();
     
     // Test scheduling
     void scheduleTest(const Patient& patient);
@@ -110,7 +114,8 @@ public:
     // Data export
     std::vector<Patient> getAllPatients() const;
     std::vector<GeneticData> getAllGeneticData() const;
-    void saveDataToFiles(const std::string& genesFile, const std::string& patientsFile) const;
+    void saveDataToFiles(const std::string& genesFile, const std::string& patientsFile,
+                         const std::string& patientGenesFile = "data/patient_genes.csv") const;
 };
 
 #endif // CANCER_DIAGNOSIS_SYSTEM_H

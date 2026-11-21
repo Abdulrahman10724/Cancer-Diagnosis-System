@@ -33,6 +33,19 @@ static string json_escape(const string &s) {
     return out;
 }
 
+// Helper: read a number (quoted or unquoted) after "key": in a naive JSON body
+static double extractNumber(const string &body, const string &key, double defaultValue = 0.0) {
+    size_t p = body.find("\"" + key + "\"");
+    if (p == string::npos) return defaultValue;
+    size_t colon = body.find(':', p);
+    if (colon == string::npos) return defaultValue;
+    size_t numStart = body.find_first_not_of(" \t\r\n\"", colon + 1);
+    if (numStart == string::npos) return defaultValue;
+    size_t numEnd = body.find_first_of(",}]\" \t\r\n", numStart);
+    string numStr = body.substr(numStart, (numEnd == string::npos ? body.size() - numStart : numEnd - numStart));
+    try { return stod(numStr); } catch(...) { return defaultValue; }
+}
+
 int serverMain() {
     httplib::Server svr;
     CancerDiagnosisSystem system;
@@ -73,6 +86,8 @@ int serverMain() {
 
         string genesFile = extract("genesFile");
         string patientsFile = extract("patientsFile");
+        string patientGenesFile = extract("patientGenesFile");
+        if (patientGenesFile.empty()) patientGenesFile = "data/patient_genes.csv";
 
         if (genesFile.empty() || patientsFile.empty()) {
             res.status = 400;
@@ -81,7 +96,7 @@ int serverMain() {
         }
 
         // Load data and train models
-        system.loadData(genesFile, patientsFile);
+        system.loadData(genesFile, patientsFile, patientGenesFile);
 
         std::ostringstream ss;
         ss << "{\"modelsTrained\":" << (system.areModelsTrained() ? "true" : "false")
@@ -120,13 +135,19 @@ int serverMain() {
         if (pid.empty()) pid = extract("patientId");
         if (pid.empty()) pid = extract("id");
         string name = extract("name");
-        string ageStr = extract("age");
-        int age = 0;
-        try { if (!ageStr.empty()) age = stoi(ageStr); } catch(...) { age = 0; }
+        int age = static_cast<int>(extractNumber(body, "age", 0.0));
 
         if (pid.empty() || name.empty()) {
             res.status = 400;
             res.set_content("{\"error\":\"Missing patient_id or name\"}", "application/json");
+            return;
+        }
+
+        // Reject duplicate patient IDs
+        Patient existing;
+        if (system.getPatientById(pid, existing)) {
+            res.status = 409;
+            res.set_content("{\"error\":\"Patient ID already exists\"}", "application/json");
             return;
         }
 
@@ -135,6 +156,7 @@ int serverMain() {
 
         // Naive scan for gene entries: look for occurrences of "geneId" or "gene_id"
         size_t pos = 0;
+        int genesAdded = 0;
         while (true) {
             size_t gpos = body.find("geneId", pos);
             if (gpos == string::npos) gpos = body.find("gene_id", pos);
@@ -183,15 +205,21 @@ int serverMain() {
             GeneticData gd(geneId, mutationScore, label);
             system.addGeneticData(gd);
             patient.addGeneticData(gd);
+            genesAdded++;
 
             pos = end + 1;
+        }
+
+        // Retrain models so they include the new genetic data
+        if (genesAdded > 0) {
+            system.retrainModels();
         }
 
         // Add patient to system history (makes patient immediately available for /diagnose)
         system.addPatient(patient);
         
         // IMPORTANT: Auto-save to CSV files immediately after adding patient
-        system.saveDataToFiles("data/genes.csv", "data/patients.csv");
+        system.saveDataToFiles("data/genes.csv", "data/patients.csv", "data/patient_genes.csv");
 
         std::ostringstream ss;
         ss << "{\"success\":true,\"patientCount\":" << system.getPatientCount()
@@ -456,7 +484,7 @@ int serverMain() {
         auto results = system.processTestQueueWithModel(model);
 
         // Persist changes to CSV files
-        system.saveDataToFiles("data/genes.csv", "data/patients.csv");
+        system.saveDataToFiles("data/genes.csv", "data/patients.csv", "data/patient_genes.csv");
 
         // Build JSON array of results
         std::ostringstream ss;

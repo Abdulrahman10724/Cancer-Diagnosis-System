@@ -4,6 +4,7 @@
 #include <iostream>
 #include <algorithm>
 #include <iomanip>
+#include <map>
 
 
 CancerDiagnosisSystem::CancerDiagnosisSystem() 
@@ -72,11 +73,37 @@ void CancerDiagnosisSystem::loadGeneticDataFromFile(const std::string& filename)
     std::cout << "Loaded " << geneticDataArray.size() << " genetic data records." << std::endl;
 }
 
-void CancerDiagnosisSystem::loadPatientsFromFile(const std::string& filename) {
+void CancerDiagnosisSystem::loadPatientsFromFile(const std::string& filename,
+                                                 const std::string& patientGenesFile) {
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << std::endl;
         return;
+    }
+    
+    // Load patient -> gene links (Patient_ID,Gene_ID) if the file exists
+    std::map<std::string, std::vector<std::string>> patientGeneIds;
+    bool hasPatientGenes = false;
+    std::ifstream pgFile(patientGenesFile);
+    if (pgFile.is_open()) {
+        hasPatientGenes = true;
+        std::string pgLine;
+        bool pgHeader = true;
+        while (std::getline(pgFile, pgLine)) {
+            if (pgHeader) { pgHeader = false; continue; }
+            if (!pgLine.empty() && pgLine.back() == '\r') pgLine.pop_back();
+            if (pgLine.empty()) continue;
+            size_t comma = pgLine.find(',');
+            if (comma == std::string::npos) continue;
+            patientGeneIds[pgLine.substr(0, comma)].push_back(pgLine.substr(comma + 1));
+        }
+        pgFile.close();
+    }
+    
+    // Gene lookup by ID (first record wins if a Gene_ID appears more than once)
+    std::map<std::string, GeneticData> geneById;
+    for (const auto& data : geneticDataArray) {
+        geneById.emplace(data.getGeneId(), data);
     }
     
     std::string line;
@@ -102,9 +129,20 @@ void CancerDiagnosisSystem::loadPatientsFromFile(const std::string& filename) {
                 int age = std::stoi(ageStr);
                 Patient patient(patientId, name, age);
                 
-                // Add a subset of genetic data to each patient (not all genes)
-                // This ensures each patient has unique genetic profiles for different predictions
-                if (!geneticDataArray.empty()) {
+                if (hasPatientGenes) {
+                    // Attach the patient's own genes saved in patient_genes.csv
+                    auto it = patientGeneIds.find(patientId);
+                    if (it != patientGeneIds.end()) {
+                        for (const auto& geneId : it->second) {
+                            auto g = geneById.find(geneId);
+                            if (g != geneById.end()) {
+                                patient.addGeneticData(g->second);
+                            }
+                        }
+                    }
+                } else if (!geneticDataArray.empty()) {
+                    // Fallback (no patient_genes.csv): add a subset of genetic data to each patient
+                    // This ensures each patient has unique genetic profiles for different predictions
                     size_t dataStart = patientIndex % geneticDataArray.size();
                     size_t dataCount = std::min(static_cast<size_t>(5), geneticDataArray.size()); // Each patient gets ~5 genes
                     
@@ -126,7 +164,8 @@ void CancerDiagnosisSystem::loadPatientsFromFile(const std::string& filename) {
 }
 
 void CancerDiagnosisSystem::loadData(const std::string& genesFile, 
-                                     const std::string& patientsFile) {
+                                     const std::string& patientsFile,
+                                     const std::string& patientGenesFile) {
     std::cout << "\n=== Loading Data ===" << std::endl;
 
     // Clear existing in-memory data to avoid duplication when loading multiple times
@@ -144,7 +183,7 @@ void CancerDiagnosisSystem::loadData(const std::string& genesFile,
     modelsTrained = false;
 
     loadGeneticDataFromFile(genesFile);
-    loadPatientsFromFile(patientsFile);
+    loadPatientsFromFile(patientsFile, patientGenesFile);
     
     std::cout << "\n=== Data Summary ===" << std::endl;
     std::cout << "Genetic records loaded: " << geneticDataArray.size() << std::endl;
@@ -178,9 +217,28 @@ void CancerDiagnosisSystem::addPatientToHistory(const Patient& patient) {
     patientHistoryHead = newNode;
 }
 
+void CancerDiagnosisSystem::updateOrAddPatientInHistory(const Patient& patient) {
+    // Update the existing node for this patient instead of adding a duplicate
+    auto current = patientHistoryHead;
+    while (current) {
+        if (current->patient.getPatientId() == patient.getPatientId()) {
+            current->patient.setRiskScore(patient.getRiskScore());
+            current->patient.setPrediction(patient.getPrediction());
+            return;
+        }
+        current = current->next;
+    }
+    addPatientToHistory(patient);
+}
+
 void CancerDiagnosisSystem::addGeneticData(const GeneticData& data) {
     geneticDataArray.push_back(data);
     mutationMapper.addMutationMapping(data.getGeneId(), data.getMutationScore());
+}
+
+void CancerDiagnosisSystem::retrainModels() {
+    prepareTrainingData();
+    trainAllModels();
 }
 
 void CancerDiagnosisSystem::scheduleTest(const Patient& patient) {
@@ -200,7 +258,7 @@ void CancerDiagnosisSystem::processTestQueue() {
         patient.setRiskScore(riskScore);
         patient.setPrediction(riskScore >= 0.5 ? 1 : 0);
         
-        addPatientToHistory(patient);
+        updateOrAddPatientInHistory(patient);
         count++;
         
         std::cout << "Processed patient: " << patient.getName() 
@@ -223,7 +281,7 @@ int CancerDiagnosisSystem::processTestQueueAndReturnCount() {
         patient.setRiskScore(riskScore);
         patient.setPrediction(riskScore >= 0.5 ? 1 : 0);
 
-        addPatientToHistory(patient);
+        updateOrAddPatientInHistory(patient);
         count++;
 
         std::cout << "Processed patient: " << patient.getName()
@@ -263,7 +321,7 @@ std::vector<std::string> CancerDiagnosisSystem::processTestQueueWithModel(ModelT
         patient.setRiskScore(riskScore);
         patient.setPrediction(prediction);
 
-        addPatientToHistory(patient);
+        updateOrAddPatientInHistory(patient);
         count++;
 
         // Build JSON-like result string for this patient
@@ -580,7 +638,8 @@ std::vector<GeneticData> CancerDiagnosisSystem::getAllGeneticData() const {
     return geneticDataArray;
 }
 
-void CancerDiagnosisSystem::saveDataToFiles(const std::string& genesFile, const std::string& patientsFile) const {
+void CancerDiagnosisSystem::saveDataToFiles(const std::string& genesFile, const std::string& patientsFile,
+                                            const std::string& patientGenesFile) const {
     // Save genetic data to genes file
     std::ofstream genesOut(genesFile);
     if (genesOut.is_open()) {
@@ -613,5 +672,25 @@ void CancerDiagnosisSystem::saveDataToFiles(const std::string& genesFile, const 
         std::cout << "✓ Saved " << count << " patient records to " << patientsFile << std::endl;
     } else {
         std::cerr << "✗ Error: Could not open " << patientsFile << " for writing" << std::endl;
+    }
+    
+    // Save patient -> gene links so each patient keeps its own genes after restart
+    std::ofstream patientGenesOut(patientGenesFile);
+    if (patientGenesOut.is_open()) {
+        patientGenesOut << "Patient_ID,Gene_ID\n";
+        auto current = patientHistoryHead;
+        int count = 0;
+        while (current) {
+            for (const auto& data : current->patient.getGeneticData()) {
+                patientGenesOut << current->patient.getPatientId() << ","
+                                << data.getGeneId() << "\n";
+                count++;
+            }
+            current = current->next;
+        }
+        patientGenesOut.close();
+        std::cout << "✓ Saved " << count << " patient-gene links to " << patientGenesFile << std::endl;
+    } else {
+        std::cerr << "✗ Error: Could not open " << patientGenesFile << " for writing" << std::endl;
     }
 }
