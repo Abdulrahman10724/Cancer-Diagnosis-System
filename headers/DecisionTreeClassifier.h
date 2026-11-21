@@ -12,11 +12,12 @@ struct TreeNode {
     int featureIndex;
     double threshold;
     int prediction;
+    double positiveFraction; // Fraction of training samples with label 1 at this node
     std::shared_ptr<TreeNode> left;
     std::shared_ptr<TreeNode> right;
     
     TreeNode() : featureIndex(-1), threshold(0.0), prediction(-1), 
-                 left(nullptr), right(nullptr) {}
+                 positiveFraction(0.0), left(nullptr), right(nullptr) {}
 };
 
 /**
@@ -36,6 +37,8 @@ private:
                                         const std::vector<int>& y) const;
     int predictSample(const std::vector<double>& sample, 
                      std::shared_ptr<TreeNode> node) const;
+    double predictSampleProbability(const std::vector<double>& sample, 
+                                    std::shared_ptr<TreeNode> node) const;
     std::shared_ptr<TreeNode> buildTree(const std::vector<std::vector<double>>& X, 
                                        const std::vector<int>& y, 
                                        int depth) const;
@@ -48,6 +51,7 @@ public:
     void fit(const std::vector<std::vector<double>>& X, const std::vector<int>& y);
     std::vector<int> predict(const std::vector<std::vector<double>>& X) const;
     int predictSingle(const std::vector<double>& sample) const;
+    double predictProbabilitySingle(const std::vector<double>& sample) const;
     
     // Utility
     void setMaxDepth(int depth);

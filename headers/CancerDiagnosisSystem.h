@@ -28,6 +28,19 @@ struct PatientNode {
 };
 
 /**
+ * @struct ModelEvaluation
+ * @brief Evaluation metrics of one model on held-out test data
+ */
+struct ModelEvaluation {
+    std::string key;
+    std::string name;
+    double accuracy;
+    double precision;
+    double recall;
+    double f1;
+};
+
+/**
  * @class CancerDiagnosisSystem
  * @brief Main controller class for the cancer diagnosis system
  */
@@ -96,6 +109,10 @@ public:
     
     // Evaluation
     void evaluateModels(const std::vector<Patient>& testPatients);
+    // Train temporary models on a stratified 80/20 hold-out split (fixed seed)
+    // and return metrics on the 20% test part. Returns false if no data/models.
+    bool evaluateModelsHoldout(std::vector<ModelEvaluation>& results, size_t& testSamples,
+                               double testRatio = 0.2, unsigned int seed = 42) const;
     void displayModelMetrics(ModelType model, const std::vector<int>& yTrue, 
                             const std::vector<int>& yPred) const;
     

@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <map>
+#include <random>
+#include <cmath>
 
 // Helper: escape JSON string
 static std::string json_escape(const std::string &s) {
@@ -496,10 +498,8 @@ double CancerDiagnosisSystem::diagnosePatient(const Patient& patient, ModelType 
             return probs[0];
         }
         case ModelType::DECISION_TREE: {
-            std::vector<int> predictions = decisionTreeModel->predict(X);
-            // Decision tree doesn't provide probabilities directly
-            // Return 1.0 if prediction is 1, 0.0 otherwise
-            return predictions[0] == 1 ? 1.0 : 0.0;
+            // Fraction of positive training samples in the reached leaf
+            return decisionTreeModel->predictProbabilitySingle(features);
         }
         case ModelType::NAIVE_BAYES: {
             double prob = naiveBayesModel->predictProbabilitySingle(features);
@@ -561,6 +561,102 @@ void CancerDiagnosisSystem::evaluateModels(const std::vector<Patient>& testPatie
     evaluator.displayMetrics(y_test, y_pred_nb);
     
     std::cout << "=====================\n" << std::endl;
+}
+
+bool CancerDiagnosisSystem::evaluateModelsHoldout(std::vector<ModelEvaluation>& results,
+                                                  size_t& testSamples,
+                                                  double testRatio,
+                                                  unsigned int seed) const {
+    results.clear();
+    testSamples = 0;
+    if (!modelsTrained || geneticDataArray.empty()) {
+        return false;
+    }
+    
+    // Group sample indices by label (stratified split)
+    std::map<int, std::vector<size_t>> indicesByLabel;
+    for (size_t i = 0; i < geneticDataArray.size(); ++i) {
+        indicesByLabel[geneticDataArray[i].getLabel()].push_back(i);
+    }
+    
+    // Shuffle each group with a fixed seed (manual Fisher-Yates so results
+    // are the same on every compiler/platform) and take testRatio of it as test data
+    std::mt19937 rng(seed);
+    std::vector<size_t> trainIdx, testIdx;
+    for (auto& group : indicesByLabel) {
+        std::vector<size_t>& idx = group.second;
+        for (size_t i = idx.size(); i > 1; --i) {
+            size_t j = rng() % i;
+            std::swap(idx[i - 1], idx[j]);
+        }
+        size_t nTest = static_cast<size_t>(std::round(idx.size() * testRatio));
+        if (nTest == 0 && idx.size() >= 2) nTest = 1;
+        for (size_t i = 0; i < idx.size(); ++i) {
+            if (i < nTest) testIdx.push_back(idx[i]);
+            else trainIdx.push_back(idx[i]);
+        }
+    }
+    
+    if (trainIdx.empty() || testIdx.empty()) {
+        return false;
+    }
+    
+    // Fit preprocessing on training part only (no information from test data)
+    std::vector<double> trainScores, testScores;
+    std::vector<int> yTrain, yTest;
+    for (size_t i : trainIdx) {
+        trainScores.push_back(geneticDataArray[i].getMutationScore());
+        yTrain.push_back(geneticDataArray[i].getLabel());
+    }
+    for (size_t i : testIdx) {
+        testScores.push_back(geneticDataArray[i].getMutationScore());
+        yTest.push_back(geneticDataArray[i].getLabel());
+    }
+    DataPreprocessor evalPreprocessor;
+    evalPreprocessor.fit(trainScores);
+    std::vector<double> trainNorm = evalPreprocessor.standardize(trainScores);
+    std::vector<double> testNorm = evalPreprocessor.standardize(testScores);
+    
+    std::vector<std::vector<double>> XTrain, XTest;
+    for (double v : trainNorm) XTrain.push_back({v});
+    for (double v : testNorm) XTest.push_back({v});
+    
+    // Temporary models with the same settings as the main models
+    LogisticRegressionModel evalLogistic(0.01, 1000);
+    KNNClassifier evalKnn(5);
+    DecisionTreeClassifier evalTree(10, 2);
+    NaiveBayesClassifier evalBayes;
+    
+    try {
+        evalLogistic.fit(XTrain, yTrain);
+        evalKnn.fit(XTrain, yTrain);
+        evalTree.fit(XTrain, yTrain);
+        evalBayes.fit(XTrain, yTrain);
+        
+        auto addResult = [&](const std::string& key, const std::string& name,
+                             const std::vector<int>& yPred) {
+            ModelEvaluation e;
+            e.key = key;
+            e.name = name;
+            e.accuracy = evaluator.accuracy(yTest, yPred);
+            e.precision = evaluator.precision(yTest, yPred);
+            e.recall = evaluator.recall(yTest, yPred);
+            e.f1 = evaluator.f1Score(yTest, yPred);
+            results.push_back(e);
+        };
+        
+        addResult("logistic", "Logistic Regression", evalLogistic.predict(XTest));
+        addResult("knn", "K-Nearest Neighbors", evalKnn.predict(XTest));
+        addResult("decision_tree", "Decision Tree", evalTree.predict(XTest));
+        addResult("naive_bayes", "Naive Bayes", evalBayes.predict(XTest));
+    } catch (const std::exception& e) {
+        std::cerr << "Error during evaluation: " << e.what() << std::endl;
+        results.clear();
+        return false;
+    }
+    
+    testSamples = testIdx.size();
+    return true;
 }
 
 void CancerDiagnosisSystem::displayModelMetrics(ModelType model, 

@@ -5,6 +5,7 @@
 #include <vector>
 #include <fstream>
 #include <mutex>
+#include <iomanip>
 
 // NOTE: This server uses the single-header cpp-httplib library.
 // Download it from: https://github.com/yhirose/cpp-httplib (place httplib.h in a folder named third_party)
@@ -301,6 +302,33 @@ int serverMain() {
         res.set_content(ss.str(), "application/json");
     });
 
+
+    // GET /evaluate -> metrics of all models on a held-out 20% test split
+    svr.Get("/evaluate", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        std::vector<ModelEvaluation> results;
+        size_t testSamples = 0;
+        if (!system.evaluateModelsHoldout(results, testSamples)) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Load data first\"}", "application/json");
+            return;
+        }
+
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(4);
+        ss << "{\"testSamples\":" << testSamples << ",\"models\":[";
+        for (size_t i = 0; i < results.size(); ++i) {
+            if (i) ss << ",";
+            ss << "{\"key\":\"" << json_escape(results[i].key)
+               << "\",\"name\":\"" << json_escape(results[i].name)
+               << "\",\"accuracy\":" << results[i].accuracy
+               << ",\"precision\":" << results[i].precision
+               << ",\"recall\":" << results[i].recall
+               << ",\"f1\":" << results[i].f1 << "}";
+        }
+        ss << "]}";
+        res.set_content(ss.str(), "application/json");
+    });
 
     // GET /queue -> { queueSize: N, patients: ["P1","P2"] }
     svr.Get("/queue", [&](const httplib::Request& req, httplib::Response& res) {
