@@ -9,6 +9,10 @@
 
 > **Student project — not for real medical use.**
 
+> **Note:** Frontend is being updated to the new API. The C++ server now works with four
+> features per patient (see [docs/API.md](docs/API.md)); some React screens still expect the
+> old one-feature responses.
+
 ![Check risk: four models each guess the chance of cancer, then a final result counts their votes](docs/screenshots/check-risk.png)
 
 ## 📋 Table of Contents
@@ -31,8 +35,9 @@
 ## 🎯 Overview
 
 The **Cancer Diagnosis System** predicts whether a patient's genes point to cancer. Each
-patient has a few genes with a mutation score from 0 to 1. The models look at the
-patient's mean mutation score and return a risk between 0 and 1.
+patient has a few genes with a mutation score from 0 to 1. Each patient is turned into four
+features (average mutation score, highest mutation score, number of high-risk genes, age),
+and four models each return a risk between 0 and 1.
 
 The project has two parts:
 
@@ -46,7 +51,8 @@ The project has two parts:
 - 🧠 **Four models from scratch**: Logistic Regression, K-Nearest Neighbors, Decision Tree and Naive Bayes
 - 🧪 **Explained predictions**: for every model you can see the numbers behind its answer
 - 📊 **Honest evaluation**: metrics on a held-out 20% split the evaluated models never trained on
-- 🧱 **Data structures you can see**: the waiting list is a queue, the patient list a linked list and the gene lookup a hash table, each animated step by step
+- 🧱 **Hand-written data structures doing real work**: hash table, linked list, KD-tree, binary heap, merge sort with prefix sums, AVL trees, a similarity graph with BFS, and an undo stack — with a `/benchmark` endpoint that measures them against simpler alternatives
+- 📚 **Docs**: [API reference](docs/API.md) and [data structures and algorithms](docs/DSA.md)
 
 ## ✨ Features
 
@@ -101,6 +107,7 @@ A friendly, light medical-app style aimed at a first-year student or a teacher.
 - **HTTP server**: [cpp-httplib](https://github.com/yhirose/cpp-httplib) v0.28.0 (single header in `third_party/`)
 - **Build**: CMake 3.10+
 - Thread-safe: every request handler locks one mutex around the shared system object
+- No STL containers beyond `vector`/`string`: every map, set, queue, stack, heap and sort is written by hand
 
 ### Frontend
 - **React 18** with **Vite**, React Router
@@ -179,6 +186,37 @@ Other scripts: `npm run build` (production build in `frontend/dist/`) and `npm r
 
 For more detail and troubleshooting, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 
+### 5. Run the tests
+
+The build also makes `cds_tests` (unit tests for every data structure and model). From the
+`build` folder:
+
+```bash
+ctest --output-on-failure
+```
+
+With Visual Studio add the configuration: `ctest -C Release --output-on-failure`.
+
+### 6. Generate a dataset (optional)
+
+`cds_datagen` writes the three CSV files of a synthetic dataset:
+
+```bash
+./build/cds_datagen --patients 400 --genes 800 --seed 42 --noise 0.10 --out data --force
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--patients N` | 400 | number of patients |
+| `--genes N` | 800 | number of genes |
+| `--seed N` | 42 | random seed (the same seed gives the same files on every compiler) |
+| `--noise X` | 0.10 | share of diagnoses flipped at random |
+| `--out DIR` | `data` | output folder |
+| `--force` | off | overwrite existing files |
+
+The command above recreates the default dataset in `data/`. Datasets can also be uploaded
+through `POST /upload` and switched with `POST /datasets/select`.
+
 ## 📖 Usage
 
 1. **Home** shows three steps. A short tour points at each part on the first visit.
@@ -196,12 +234,15 @@ For more detail and troubleshooting, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 ```
 Cancer-Diagnosis-System/
 ├── data/
-│   ├── genes.csv              # Genetic records: Gene_ID, Mutation_Score, Label
-│   ├── patients.csv           # Patients: Patient_ID, Name, Age
+│   ├── genes.csv              # Genes: Gene_ID, Mutation_Score
+│   ├── patients.csv           # Patients: Patient_ID, Name, Age, Diagnosis
 │   ├── patient_genes.csv      # Which genes belong to which patient
-│   └── test_*.csv             # Extra test datasets
+│   ├── uploads/<name>/        # Uploaded datasets (created by POST /upload)
+│   └── test_*.csv             # Old-format files, not used by the server
 ├── headers/                   # C++ headers (models, data structures, system)
 ├── src/                       # C++ sources; Server.cpp is the HTTP API
+├── tests/test_main.cpp        # Unit tests (cds_tests, run with ctest)
+├── tools/generate_data.cpp    # Dataset generator (cds_datagen)
 ├── third_party/httplib.h      # cpp-httplib
 ├── frontend/                  # React app
 │   └── src/
@@ -213,9 +254,12 @@ Cancer-Diagnosis-System/
 │       │                      # PatientReport, LinkedList, HashTable
 │       ├── hooks/useRiskRun.js # Runs Check risk and its step-by-step animation
 │       └── lib/               # metrics.js, format.js, models.js, hash.js, tour.js
-├── docs/screenshots/
-├── generate_genes.py          # Generates a realistic genes.csv
-├── main.cpp                   # Optional command-line version
+├── docs/
+│   ├── API.md                 # Every endpoint with request and response
+│   ├── DSA.md                 # Data structures, complexities, benchmark results
+│   └── screenshots/
+├── generate_genes.py          # Old genes.csv generator (kept; replaced by cds_datagen)
+├── main.cpp                   # Old command-line version (not built)
 ├── CMakeLists.txt
 ├── SETUP_GUIDE.md
 └── README.md
@@ -223,146 +267,99 @@ Cancer-Diagnosis-System/
 
 ## 🔌 API Documentation
 
-The server listens on `http://localhost:8080`. Every response carries
-`Access-Control-Allow-Origin: *`. Errors are JSON: `{"error":"..."}`, with `400` for bad
-input or when no data is loaded (`{"error":"Load data first"}`), `404` for unknown IDs and
-`409` for a duplicate patient ID.
+The full reference with request and response shapes is in **[docs/API.md](docs/API.md)**.
+The server listens on `http://localhost:8080`; every response, errors included, carries
+`Access-Control-Allow-Origin: *`. Errors are `{"error":"..."}` with `400` (bad input, no data,
+invalid dataset — then also `"problems":[...]`), `404` (unknown ID) or `409` (duplicate).
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/status` | `modelsTrained`, `geneticCount`, `patientCount` |
-| POST | `/load` | Load CSV files and train. Body: `{"genesFile":"data/genes.csv","patientsFile":"data/patients.csv"}` (optional `patientGenesFile`) |
-| GET | `/patients` | Patients in linked-list order (head first), with `riskScore`, `prediction` and their `genes` |
-| POST | `/patients` | Add a patient: `{"patient_id","name","age","geneticRecords":[{"geneId","mutationScore","label"}]}`. Retrains, saves the CSV files |
-| GET | `/patients/search?id=ID` | Linear search of the linked list |
-| GET | `/genetic` | All genetic records |
-| GET | `/diagnose?patient_id=ID&model=M&k=K` | Diagnose one patient |
-| GET | `/evaluate` | Metrics on a held-out 20% split, with per-sample data |
-| GET | `/hashmap` | Buckets of the mutation hash table |
-| GET | `/queue` | Queued patient IDs, front first |
-| POST | `/queue` | Add a patient to the rear: `{"patient_id":"P001"}` |
-| POST | `/queue/process` | Process the whole queue: `{"model":"logistic"}` |
-
-### `GET /diagnose`
-
-`model` is `logistic`, `knn`, `decision_tree`, `naive_bayes` (single model, returns
-`{"patient_id","riskScore","prediction"}`) or `all`. `k` is optional (odd, 1–15, default 5)
-and changes K for KNN for this request only.
-
-`model=all` returns all four models with the numbers behind each answer:
-
-```json
-{
-  "patient_id": "P007",
-  "featureRaw": 0.52578,
-  "featureScaled": 0.179608,
-  "scale": { "mean": 0.487289, "std": 0.214304 },
-  "geneCount": 5,
-  "threshold": 0.5,
-  "models": {
-    "logistic": { "risk": 0.529, "prediction": 1, "explain": { "weight": 0.9475, "bias": -0.0531, "z": 0.117 } },
-    "knn": { "risk": 0.6, "prediction": 1, "k": 5,
-             "explain": { "neighbors": [ { "gene_id": "GENE_076", "mutation_score": 0.5215, "label": 0, "distance": 0.02 } ],
-                          "votesCancer": 3, "votesSafe": 2 } },
-    "decision_tree": { "risk": 0.0, "prediction": 0,
-                       "explain": { "path": [ { "threshold": 0.527, "thresholdScaled": 0.1855, "wentLeft": true, "positiveFraction": 0.485, "samples": 206 } ],
-                                    "leafPositiveFraction": 0.0, "leafSamples": 3 } },
-    "naive_bayes": { "risk": 0.514, "prediction": 1,
-                     "explain": { "safe": { "mean": -0.46, "std": 0.83, "prior": 0.51 },
-                                  "cancer": { "mean": 0.49, "std": 0.94, "prior": 0.49 } } }
-  },
-  "consensus": { "cancer": 3, "safe": 1 }
-}
-```
-
-`featureRaw` is the patient's mean mutation score (what the models see), `featureScaled`
-the same value after standardization. KNN neighbour `mutation_score` values are raw;
-`distance` is measured in the scaled space the model uses. Decision-tree `threshold` is on
-the raw score scale and `thresholdScaled` is the value the tree actually compares.
-
-### `GET /evaluate`
-
-The genetic data is split 80% train / 20% test, stratified by label, with a fixed seed.
-Temporary copies of the models train on the 80% and are measured on the 20%; the models
-used by `/diagnose` stay trained on all the data. Predictions use `risk >= 0.5`.
-
-```json
-{
-  "testSamples": 41,
-  "models": [
-    { "key": "logistic", "name": "Logistic Regression",
-      "accuracy": 0.7561, "precision": 0.8125, "recall": 0.65, "f1": 0.7222,
-      "confusion": { "tp": 13, "fp": 3, "tn": 18, "fn": 7 },
-      "samples": [ { "gene_id": "GENE_001", "mutation_score": 0.3633, "label": 0, "risk": 0.3503 } ] }
-  ]
-}
-```
-
-The frontend recomputes the metrics for other thresholds from `samples`.
-
-### `GET /hashmap`
-
-```json
-{ "bucketCount": 512, "size": 206, "loadFactor": 0.4023,
-  "buckets": [ { "index": 0, "items": [] },
-               { "index": 7, "items": [ { "key": "GENE_001", "value": 0.3633, "hash": 2016933030407 },
-                                         { "key": "GENE_122", "value": 0.4271, "hash": 2016933031431 } ] } ] }
-```
-
-Hash values above 2^53 lose precision as JSON numbers in JavaScript; the frontend
-recomputes the exact hash with `BigInt` (`frontend/src/lib/hash.js`).
-
-### `GET /patients/search?id=ID`
-
-```json
-{ "found": true, "hops": 9, "order": ["P013","P012","P011","P002","P001","P010","P009","P008","P007"] }
-```
-
-`order` lists every node visited from the head, in order.
+| GET | `/status` | Active dataset, counts, whether the models are trained |
+| POST | `/load` | Load CSV files by path |
+| POST | `/upload` | Upload a dataset as CSV text; validated, saved to `data/uploads/<name>/`, loaded |
+| GET | `/datasets` | `default` and every uploaded dataset, with counts |
+| POST | `/datasets/select` | Switch to another dataset |
+| GET / POST | `/patients` | List patients / add one (retrains and saves) |
+| DELETE | `/patients/{id}` | Delete a patient |
+| POST | `/undo` | Undo the last add or delete |
+| GET | `/patients/search`, `/patients/index`, `/patients/range` | Linked-list search, AVL ID lookup, AVL risk range |
+| GET | `/genetic` | All genes |
+| GET | `/diagnose` | One model or all four, with explanations |
+| GET | `/evaluate`, `/crossval` | 80/20 test metrics with ROC/AUC; k-fold cross-validation |
+| GET | `/features`, `/tree`, `/kdtree` | Feature statistics and correlation; the decision tree; the KD-tree |
+| GET / POST | `/queue`, `/queue/process` | FIFO waiting list |
+| GET / POST | `/triage`, `/triage/process` | Priority queue by risk (binary heap) |
+| GET | `/graph`, `/graph/bfs` | Patient similarity graph, components and BFS |
+| GET | `/hashmap` | Buckets of the gene hash table |
+| GET | `/benchmark?n=2000&seed=1` | Timings of the data structures against simpler alternatives |
 
 ## 🤖 Machine Learning Models
 
-All four use one feature: the patient's mean mutation score, standardized with the mean
-and standard deviation of the training genes.
+Every patient becomes four features (`src/FeatureExtractor.cpp`):
 
-- **Logistic Regression**: gradient descent on log loss (learning rate 0.01, 1000 iterations); risk = σ(w·x + b).
-- **K-Nearest Neighbors**: Euclidean distance; risk = share of the K nearest training genes labelled cancerous (K = 5 by default).
-- **Decision Tree**: Gini impurity, maximum depth 10; risk = share of cancerous training genes in the leaf the patient reaches.
-- **Naive Bayes**: one Gaussian per class plus the class prior; risk = posterior probability of the cancerous class.
+| Feature | Meaning |
+|---|---|
+| `avgMutation` | mean mutation score of the patient's genes |
+| `maxMutation` | highest mutation score |
+| `highRiskGenes` | number of genes with a score of 0.7 or more (`HIGH_RISK_CUTOFF`) |
+| `age` | the patient's age |
+
+Each feature is standardized with its own mean and standard deviation from the training
+patients. The four models train on the labelled patients:
+
+- **Logistic Regression**: gradient descent on log loss (learning rate 0.1, 2000 iterations), one weight per feature; risk = σ(w·x + b).
+- **K-Nearest Neighbors**: K = 5, neighbours found with a KD-tree; risk = share of the K nearest patients with cancer.
+- **Decision Tree**: Gini impurity, maximum depth 5, minimum 4 patients to split, split search with merge sort and prefix sums.
+- **Naive Bayes**: one Gaussian per feature and class plus the class prior; risk = posterior probability of cancer.
+
+On the default dataset (80/20 stratified split, seed 42): logistic regression 0.800 accuracy
+(AUC 0.828), KNN 0.762 (0.820), decision tree 0.838 (0.839), Naive Bayes 0.787 (0.841).
+5-fold cross-validation and the details are in [docs/DSA.md](docs/DSA.md).
 
 ## 🧱 Data Structures
 
-- **Linked list** (`PatientNode`): patient history. Searching walks the list from the head, O(n).
-- **Queue** (`std::queue<Patient>`): test requests, first in, first out.
-- **Hash table** (`HashMapper`): gene ID → mutation score. A separate-chaining hash table
-  implemented in this project: a vector of buckets, each a linked list of (key, value)
-  pairs; polynomial rolling hash `h = h * 31 + c` (unsigned 64-bit) modulo the bucket
-  count; starts with 16 buckets and doubles when the load factor passes 0.75.
-- **Vector**: the genetic records used for training.
+All written by hand; [docs/DSA.md](docs/DSA.md) gives where each is used, why, the
+complexity of every operation and measured benchmark numbers.
+
+- **Linked list**: the patient list in insertion order
+- **Hash table** (separate chaining, rehash at load factor 0.75): gene ID → mutation score
+- **KD-tree**: KNN neighbour search and graph edge search
+- **Binary heap**: KNN top-K and the triage priority queue
+- **Merge sort + prefix sums**: decision-tree split search
+- **AVL trees**: patient ID index and risk range index
+- **Graph + BFS**: patient similarity clusters
+- **Stack**: undo (up to 50 steps); **linked queue**: waiting list and BFS
 
 ## 📊 Data Format
 
-### genes.csv
-```csv
-Gene_ID,Mutation_Score,Label
-GENE_001,0.3633,0
-GENE_003,0.7553,1
-```
+A dataset is three CSV files. Loading is all-or-nothing: if any line is wrong, the server
+answers `400` with a list of problems (at most 50) and keeps the dataset it had.
 
 ### patients.csv
 ```csv
-Patient_ID,Name,Age
-P001,John Doe,45
+Patient_ID,Name,Age,Diagnosis
+P001,Hira Malik,79,0
+P002,Amna Chaudhry,52,1
+P003,New Patient,40,
 ```
+`Diagnosis` is `1` (cancer), `0` (no cancer) or empty (unknown). At least 10 patients need
+a diagnosis, with both values present. Age is a whole number from 0 to 120.
 
-### patient_genes.csv
-Links each patient to its own genes by `Gene_ID`. The server writes it whenever it saves.
-If the file does not exist, each patient is given 5 consecutive genes from `genes.csv`.
+### genes.csv
+```csv
+Gene_ID,Mutation_Score
+GENE_001,0.3745
+GENE_002,0.7965
+```
+Scores are from 0 to 1. A third column (such as the old `Label`) is ignored.
+
+### patient_genes.csv (required)
 ```csv
 Patient_ID,Gene_ID
-P001,GENE_001
-P001,GENE_002
+P001,GENE_312
+P001,GENE_239
 ```
+Every patient needs at least one gene, and every ID must exist in the other two files.
 
 ## 📸 Screenshots
 
