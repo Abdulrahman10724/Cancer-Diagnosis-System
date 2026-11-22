@@ -396,7 +396,21 @@ int serverMain() {
                << "\",\"accuracy\":" << results[i].accuracy
                << ",\"precision\":" << results[i].precision
                << ",\"recall\":" << results[i].recall
-               << ",\"f1\":" << results[i].f1 << "}";
+               << ",\"f1\":" << results[i].f1
+               << ",\"confusion\":{\"tp\":" << results[i].confusion.truePositive
+               << ",\"fp\":" << results[i].confusion.falsePositive
+               << ",\"tn\":" << results[i].confusion.trueNegative
+               << ",\"fn\":" << results[i].confusion.falseNegative << "}"
+               << ",\"samples\":[";
+            for (size_t j = 0; j < results[i].samples.size(); ++j) {
+                const auto& sm = results[i].samples[j];
+                if (j) ss << ",";
+                ss << "{\"gene_id\":\"" << json_escape(sm.geneId) << "\""
+                   << ",\"mutation_score\":" << sm.mutationScore
+                   << ",\"label\":" << sm.label
+                   << ",\"risk\":" << sm.risk << "}";
+            }
+            ss << "]}";
         }
         ss << "]}";
         res.set_content(ss.str(), "application/json");

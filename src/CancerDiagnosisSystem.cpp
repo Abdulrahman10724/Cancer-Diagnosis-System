@@ -706,8 +706,13 @@ bool CancerDiagnosisSystem::evaluateModelsHoldout(std::vector<ModelEvaluation>& 
         evalTree.fit(XTrain, yTrain);
         evalBayes.fit(XTrain, yTrain);
         
+        // Predictions use risk >= 0.5 for every model, so the metrics here match
+        // what the frontend recomputes from the per-sample risks at threshold 0.5.
         auto addResult = [&](const std::string& key, const std::string& name,
-                             const std::vector<int>& yPred) {
+                             const std::vector<double>& risks) {
+            std::vector<int> yPred;
+            for (double r : risks) yPred.push_back(r >= 0.5 ? 1 : 0);
+            
             ModelEvaluation e;
             e.key = key;
             e.name = name;
@@ -715,13 +720,25 @@ bool CancerDiagnosisSystem::evaluateModelsHoldout(std::vector<ModelEvaluation>& 
             e.precision = evaluator.precision(yTest, yPred);
             e.recall = evaluator.recall(yTest, yPred);
             e.f1 = evaluator.f1Score(yTest, yPred);
+            e.confusion = evaluator.getConfusionMatrix(yTest, yPred);
+            for (size_t i = 0; i < testIdx.size(); ++i) {
+                EvalSample s;
+                s.geneId = geneticDataArray[testIdx[i]].getGeneId();
+                s.mutationScore = testScores[i];
+                s.label = yTest[i];
+                s.risk = risks[i];
+                e.samples.push_back(s);
+            }
             results.push_back(e);
         };
         
-        addResult("logistic", "Logistic Regression", evalLogistic.predict(XTest));
-        addResult("knn", "K-Nearest Neighbors", evalKnn.predict(XTest));
-        addResult("decision_tree", "Decision Tree", evalTree.predict(XTest));
-        addResult("naive_bayes", "Naive Bayes", evalBayes.predict(XTest));
+        std::vector<double> treeRisks;
+        for (const auto& x : XTest) treeRisks.push_back(evalTree.predictProbabilitySingle(x));
+        
+        addResult("logistic", "Logistic Regression", evalLogistic.predictProbabilityBatch(XTest));
+        addResult("knn", "K-Nearest Neighbors", evalKnn.predictProbability(XTest));
+        addResult("decision_tree", "Decision Tree", treeRisks);
+        addResult("naive_bayes", "Naive Bayes", evalBayes.predictProbability(XTest));
     } catch (const std::exception& e) {
         std::cerr << "Error during evaluation: " << e.what() << std::endl;
         results.clear();

@@ -32,6 +32,13 @@ struct PatientNode
  * @struct ModelEvaluation
  * @brief Evaluation metrics of one model on held-out test data
  */
+struct EvalSample {
+    std::string geneId;
+    double mutationScore; // raw score
+    int label;            // true label
+    double risk;          // predicted probability of label 1
+};
+
 struct ModelEvaluation {
     std::string key;
     std::string name;
@@ -39,6 +46,8 @@ struct ModelEvaluation {
     double precision;
     double recall;
     double f1;
+    ConfusionMatrix confusion;      // at threshold 0.5
+    std::vector<EvalSample> samples; // one entry per held-out test gene
 };
 
 /**
