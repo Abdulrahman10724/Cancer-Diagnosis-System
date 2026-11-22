@@ -1,0 +1,50 @@
+.label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px 8px;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-control);
+  min-width: 0;
+}
+
+.barcode {
+  font-family: var(--font-barcode);
+  font-size: 2.5rem;
+  line-height: 1;
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: normal;
+}
+
+.meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2);
+  font-size: var(--text-sm);
+}
+
+.name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.age {
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.compact {
+  padding: 4px 8px 6px;
+}
+
+.compact .barcode {
+  font-size: 1.75rem;
+}
+
+.compact .meta {
+  font-size: var(--text-xs);
+}

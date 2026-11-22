@@ -19,3 +19,8 @@ Makefile
 .vs/
 .vscode/
 .idea/
+
+## Frontend
+frontend/node_modules/
+frontend/dist/
+.env*

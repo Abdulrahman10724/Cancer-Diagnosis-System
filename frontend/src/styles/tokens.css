@@ -1,0 +1,77 @@
+/*
+ * Pathology Bench design tokens.
+ *
+ * Model colours identify models only; outcome colours (--safe, --risk) identify
+ * outcomes only. Never mix the two.
+ *
+ * Palette validation (dataviz validate_palette.js):
+ *   Light, surface #FFFFFF / #F5F7F8 - #6A3FA0, #C98A00, #D0457E, #0089B0:
+ *     lightness, chroma, CVD (worst dE 10.7) and normal-vision (worst dE 22.0) PASS.
+ *     Contrast WARN for amber (#C98A00 = 2.95:1 on white) -> every band, lane, plate
+ *     and legend prints the model name as text.
+ *   Gel, surface #2B3036 - the light stains FAIL the dark lightness band, so the gel
+ *   uses lighter steps of the same hues (OKLCH L 0.60-0.665):
+ *     #A47BE1, #C48600, #E75A91, #31A1C9 -> all checks PASS, every colour >= 3:1
+ *     (worst CVD dE 10.4 deutan, normal-vision dE 20.3).
+ */
+:root {
+  /* Surfaces and ink */
+  --slide: #F5F7F8;
+  --paper: #FFFFFF;
+  --ink: #1E2329;
+  --ink-muted: #5B6470;
+  --rule: #D9DEE3;
+  --rule-strong: #AEB6BF;
+
+  /* Gel bench (dark surface, gel only) */
+  --bench: #2B3036;
+  --bench-deep: #23272C;
+  --bench-ink: #E8EBEE;
+  --bench-ink-muted: #A9B0B8;
+  --bench-rule: #4A525B;
+
+  /* Model stains on light surfaces */
+  --stain-lr: #6A3FA0;
+  --stain-knn: #C98A00;
+  --stain-dt: #D0457E;
+  --stain-nb: #0089B0;
+
+  /* Model stains on the gel (validated against --bench) */
+  --gel-lr: #A47BE1;
+  --gel-knn: #C48600;
+  --gel-dt: #E75A91;
+  --gel-nb: #31A1C9;
+  --gel-consensus: #C9CED4;
+
+  /* Outcomes */
+  --safe: #2E7D5B;
+  --risk: #B3261E;
+  --safe-tint: #E3F0EA;
+  --risk-tint: #F7E4E2;
+
+  /* Type scale (rem) */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.875rem;
+  --text-2xl: 2.625rem;
+
+  --font-ui: 'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --font-barcode: 'Libre Barcode 128 Text', var(--font-ui);
+
+  /* 8px spacing grid */
+  --s1: 8px;
+  --s2: 16px;
+  --s3: 24px;
+  --s4: 32px;
+  --s5: 40px;
+  --s6: 48px;
+  --s8: 64px;
+
+  --radius-control: 2px;
+  --content-max: 1200px;
+  --notebook-width: 288px;
+  --focus: 2px solid var(--ink);
+  --drawer-shadow: -8px 0 24px rgba(30, 35, 41, 0.14);
+}

@@ -1,0 +1,53 @@
+.empty,
+.error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s3);
+  border: 1px dashed var(--rule-strong);
+  background: var(--paper);
+  max-width: 640px;
+}
+
+.error {
+  border: 1px solid var(--risk);
+  border-left-width: 4px;
+}
+
+.error h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  color: var(--risk);
+}
+
+.action {
+  margin-top: var(--s1);
+  display: flex;
+  gap: var(--s1);
+  flex-wrap: wrap;
+}
+
+.command {
+  margin-top: var(--s1);
+}
+
+.commandLabel {
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+
+.command code {
+  display: inline-block;
+  font-family: inherit;
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: var(--slide);
+  border: 1px solid var(--rule);
+  font-size: var(--text-sm);
+}
+
+.loading {
+  color: var(--ink-muted);
+  padding: var(--s2) 0;
+}
