@@ -416,6 +416,28 @@ int serverMain() {
         res.set_content(ss.str(), "application/json");
     });
 
+    // GET /patients/search?id=P007 -> linear search of the linked list, with the visit order
+    svr.Get("/patients/search", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        string pid = req.has_param("id") ? req.get_param_value("id") : string();
+        if (pid.empty()) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Missing id\"}", "application/json");
+            return;
+        }
+        std::vector<std::string> order;
+        bool found = system.searchPatientTrace(pid, order);
+        std::ostringstream ss;
+        ss << "{\"found\":" << (found ? "true" : "false")
+           << ",\"hops\":" << order.size() << ",\"order\":[";
+        for (size_t i = 0; i < order.size(); ++i) {
+            if (i) ss << ",";
+            ss << "\"" << json_escape(order[i]) << "\"";
+        }
+        ss << "]}";
+        res.set_content(ss.str(), "application/json");
+    });
+
     // GET /hashmap -> buckets of the mutation hash table (separate chaining)
     svr.Get("/hashmap", [&](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);

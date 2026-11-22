@@ -828,6 +828,28 @@ bool CancerDiagnosisSystem::getPatientById(const std::string& patientId, Patient
     return false;
 }
 
+bool CancerDiagnosisSystem::searchPatientTrace(const std::string& patientId,
+                                               std::vector<std::string>& visitedOrder) const {
+    auto trim = [](const std::string& str) {
+        size_t first = str.find_first_not_of(" \t\n\r");
+        if (first == std::string::npos) return std::string("");
+        size_t last = str.find_last_not_of(" \t\n\r");
+        return str.substr(first, (last - first + 1));
+    };
+    
+    std::string trimmedId = trim(patientId);
+    visitedOrder.clear();
+    auto current = patientHistoryHead;
+    while (current) {
+        visitedOrder.push_back(current->patient.getPatientId());
+        if (trim(current->patient.getPatientId()) == trimmedId) {
+            return true;
+        }
+        current = current->next;
+    }
+    return false;
+}
+
 std::vector<Patient> CancerDiagnosisSystem::getAllPatients() const {
     std::vector<Patient> patients;
     auto current = patientHistoryHead;

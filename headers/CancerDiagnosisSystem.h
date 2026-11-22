@@ -197,6 +197,9 @@ public:
     size_t getPatientCount() const;
     bool areModelsTrained() const;
     bool getPatientById(const std::string &patientId, Patient &outPatient) const;
+    // Linear search of the patient-history linked list from the head.
+    // visitedOrder receives every patient ID visited, in order.
+    bool searchPatientTrace(const std::string &patientId, std::vector<std::string> &visitedOrder) const;
     // All four models for one patient with explanation data. k > 0 overrides
     // the KNN K for this call only. Returns false if models are not trained.
     bool explainPatient(const Patient &patient, int k, DiagnosisExplanation &out) const;
