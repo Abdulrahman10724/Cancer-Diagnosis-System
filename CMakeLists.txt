@@ -42,3 +42,7 @@ else()
     target_link_libraries(cds_server PRIVATE Threads::Threads)
 endif()
 
+
+# Synthetic data generator
+add_executable(cds_datagen tools/generate_data.cpp src/FeatureExtractor.cpp src/Patient.cpp src/HashMapper.cpp)
+target_include_directories(cds_datagen PRIVATE headers)
