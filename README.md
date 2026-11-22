@@ -1,6 +1,6 @@
 # 🔬 Cancer Diagnosis System
 
-> **Cancer risk from genetic mutation scores with four machine learning models written from scratch in C++, and a React interface that shows, step by step, what each model does.**
+> **A cancer-risk pipeline built on data structures: four models written from scratch in C++, every step running on a hand-written data structure, and a React app you ride through like a metro line.**
 
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://en.cppreference.com/)
 [![CMake](https://img.shields.io/badge/CMake-3.10+-green.svg)](https://cmake.org/)
@@ -9,11 +9,7 @@
 
 > **Student project — not for real medical use.**
 
-> **Note:** Frontend is being updated to the new API. The C++ server now works with four
-> features per patient (see [docs/API.md](docs/API.md)); some React screens still expect the
-> old one-feature responses.
-
-![Check risk: four models each guess the chance of cancer, then a final result counts their votes](docs/screenshots/check-risk.png)
+![The metro map: eight stations from Data to Benchmark, with one coloured line per data structure stopping where it does real work](docs/screenshots/map.png)
 
 ## 📋 Table of Contents
 
@@ -43,8 +39,9 @@ The project has two parts:
 
 - A **C++17 HTTP server** (`cds_server`, port 8080) with four models implemented from
   scratch and the data structures the course asks for, each used for a real job.
-- A **React frontend** (`frontend/`) that shows every result and explains how each model
-  reached it.
+- A **React frontend** (`frontend/`), “Night Metro”: the pipeline drawn as a metro map. Each
+  station is a pipeline step, each coloured line is a data structure, and a line stops at a
+  station where that structure does real work.
 
 ### Key Highlights
 
@@ -56,49 +53,46 @@ The project has two parts:
 
 ## ✨ Features
 
-The app is written in plain words for people with no biology or machine-learning
-background. Every screen starts with one sentence saying what it is for, and every
-technical term has a "?" with a short explanation.
+The app is a journey through eight stations, travelled in order. A station unlocks when the
+one before it is finished by a real action (loading data, splitting, opening every model…),
+and you can always go back. Progress is kept in the browser; switching datasets restarts
+stations 2 to 8, because every result changes.
 
-- **Home**: three steps (Load the data → Add or pick a patient → Check the risk), each
-  ticked off as you complete it, plus a short guided tour on the first visit
-- **Check risk** (main screen): the patient's gene scores flow into four model cards,
-  each card fills its risk bar, and the final result counts the votes ("3 of 4 models
-  say cancer"). Confidence (High / Medium / Low), a "models disagree" note, a comparison
-  chart, a KNN "how many similar genes (K)" control and side-by-side comparison of two patients
-- **Why this result?**: one animated picture per model: KNN's nearest genes voting, the
-  decision tree's yes/no questions, logistic regression's S-curve and Naive Bayes' two hills
-- **Add patient**: gene scores with sliders, a yes/no "linked to cancer?" answer and a live
-  average; the models learn from the new genes
-- **Model accuracy**: ranked accuracy, precision, recall and F1 on hidden test genes, a
-  2×2 table in words (found cancer, missed cancer, false alarm, correctly said no cancer)
-  and a "cancer line" slider that shows the trade-off
-- **Waiting list** (queue), **Patient list** (linked list) and **Gene lookup** (hash table)
-  animate how each data structure works
-- **Patient report**: one printable page (Print / Save as PDF)
-- **Activity**: a list of what happened, exportable as `.txt`
+| # | Station | What you do | Lines (data structures) |
+|---|---|---|---|
+| 1 | Data | Load the sample dataset, upload your own three CSVs (with a preview and a list of every problem if a file is wrong) or pick a saved upload; browse the patients; see a gene ID hashed into its bucket | Hash table, core |
+| 2 | Features | Pick a patient and watch their genes become four numbers; compare cancer and no-cancer histograms; read the correlation heatmap | Hash table, core |
+| 3 | Scale | Switch the four rulers from raw values to z-scores | Core |
+| 4 | Split | Shuffle 400 patients into a stratified 320 / 80 split, then into 5 folds with real fold scores | Core (shuffle) |
+| 5 | Train | Logistic weights, the KNN KD-tree and K, the decision tree’s questions, Naive Bayes’ bell curves | Merge sort, KD-tree, heap |
+| 6 | Predict | Diagnose a patient (four bars, a 50% cancer line, a vote, and “Why?” per model); add, delete and undo patients; a queue and a triage heap side by side; linked list vs AVL search; the similarity graph with a BFS wave | KD-tree, heap, AVL tree, graph · BFS, core |
+| 7 | Evaluate | Accuracy, precision, recall, F1 and a 2×2 table in words; a threshold slider recomputed in the browser; ROC curves with AUC; 5-fold cross-validation | Merge sort, core |
+| 8 | Benchmark | A departure board: the simple way vs our structure at 2,000 or 20,000 patients | Every line |
+
+The landing page explains the idea in one screen and shows three measured speed-ups.
 
 ## 🎨 Design
 
-A friendly, light medical-app style aimed at a first-year student or a teacher.
-
-- **Plain language**: screens are named for what you do (Add patient, Check risk, Model
-  accuracy). Results are sentences: "Naive Bayes thinks there is a 72% chance of cancer, so
-  it says cancer."
-- **Risk is never colour alone**: Low (green ✓, under 35%), Medium (amber !, 35–65%) and
-  High (red ▲, over 65%) always show a word and an icon. These levels are for display; a
-  model's own answer always uses the 50% cancer line.
-- **Model colours** identify models only and always appear next to the model's name:
-  Logistic Regression `#6A3FA0`, KNN `#C98A00`, Decision Tree `#D0457E`, Naive Bayes `#0089B0`.
-  The risk colours are lighter than text needs, so risk *words* use darker shades
-  (5.3:1 contrast or more); bars and icons use the bright colours.
-- **Animation explains**: when you press Check risk, the steps the system takes are shown
-  in order (reading the genes, each model deciding, the votes being counted). Every other
-  animation answers something you did. With reduced motion turned on, results appear at once.
-- **Type**: Atkinson Hyperlegible Next, a typeface designed for readability, with
-  tabular figures for numbers.
-- **Accessible**: keyboard access everywhere, visible focus, panels that trap focus and
-  close on Esc, the final result announced to screen readers, and 4.5:1 text contrast.
+- **One idea per screen**: every station has one sentence, one main panel and one main
+  action; extra parts sit in tabs or a drawer.
+- **Colour means a data structure.** Six line colours (hash table, merge sort, KD-tree, heap,
+  AVL tree, graph · BFS) plus the grey core line, always shown with their name. Checked
+  with the dataviz palette validator on both surfaces: on the night map
+  `#4778F5 #DB7618 #9460E8 #10A58C #B38A12 #EA4D82` (all checks pass), on the light pages
+  `#2F6BFF #FF8A00 #8E44EC #00A88F #C49A00 #F0436A` (pass; orange and gold are below 3:1
+  on white, so they never appear without their name).
+- **Models are not coloured**: they are told apart by ink shade, dash pattern and name, so a
+  colour never means two things. Diagnosis is dark ink (cancer) vs grey (no cancer).
+- **Outcomes** (✓ Low risk, ! Borderline, ▲ High risk; right / wrong) use their own green,
+  amber and red, always with an icon and a word.
+- **Type**: Overpass for everything (a typeface from highway signage), Overpass Mono only
+  for the benchmark board and the hash formula. Tabular figures for numbers.
+- **Motion explains**: the map draws its lines once per session, the train glides to the
+  next station when it unlocks, bars grow and numbers count up only after an action, and
+  the benchmark board flips its digits in. With reduced motion on, everything appears at once.
+- **Accessible**: keyboard access to every station, line and control; visible focus; drawers
+  trap focus and close on Esc; verdicts and unlocks are announced; works down to 390px wide
+  (the map turns vertical).
 
 ## 🛠️ Tech Stack
 
@@ -111,8 +105,9 @@ A friendly, light medical-app style aimed at a first-year student or a teacher.
 
 ### Frontend
 - **React 18** with **Vite**, React Router
-- **framer-motion** (all animation), **d3-scale** (scales only; every chart is hand-drawn SVG), **lucide-react** (navigation icons)
-- CSS Modules and one `tokens.css`; fonts from `@fontsource`
+- **framer-motion** (all animation), **d3-scale** and **d3-shape** (scales and paths; every chart is hand-drawn SVG), **d3-force** (layout of the similarity graph only)
+- CSS Modules and one `tokens.css`; Overpass and Overpass Mono from `@fontsource`; icons drawn as inline SVG
+- `src/api/client.js` is the only place that calls the server
 
 ## 🚀 Getting Started
 
@@ -176,11 +171,11 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (normally http://localhost:5173). On **Home**, follow step 1 and choose
-**Load data**. The server reads the CSV files and trains the four models.
+Open the URL Vite prints (normally http://localhost:5173), press **Start the journey**, then
+**Start at Data** on the map and **Load dataset**.
 
-The frontend talks to `http://localhost:8080` by default. To use another address, change
-it on the Start screen (under Advanced), or set `VITE_API_URL` before `npm run dev`.
+The frontend talks to `http://localhost:8080` by default. To use another address, set
+`VITE_API_URL` before `npm run dev`, or change it on the map under **Menu → Server address**.
 
 Other scripts: `npm run build` (production build in `frontend/dist/`) and `npm run lint`.
 
@@ -219,15 +214,14 @@ through `POST /upload` and switched with `POST /datasets/select`.
 
 ## 📖 Usage
 
-1. **Home** shows three steps. A short tour points at each part on the first visit.
-2. **Start**: press **Load data**. The checklist ticks off reading the files and training
-   the 4 models.
-3. **Add patient**: enter a patient and their gene scores, then **Save patient**.
-4. **Check risk**: pick a patient and press **Check risk**. Press **Why this result?** on
-   any model to see how it decided.
-5. **Model accuracy**: see how often each model is right, and move the cancer line.
-6. **Waiting list**, **Patient report**, **Patient list (linked list)** and **Gene lookup
-   (hash table)** are in the sidebar (on a phone, under **More**).
+1. **Landing page** (`/`): the idea in one screen. **Start the journey** opens the map.
+2. **Map** (`/map`): press a station to travel there, or a line to see what that data
+   structure does and where. Locked stations show a lock and say what to finish first.
+   **Menu** holds **Reset journey** and the server address.
+3. **Stations** (`/station/data` … `/station/benchmark`): each one says what happens there
+   in one sentence, has one main panel, and shows the lines that stop there. The bar at the
+   top is a small map; **Next station** unlocks when the station is finished.
+4. **Benchmark**: the 20,000-patient board takes about 20 seconds on the server.
 
 ## 📁 Project Structure
 
@@ -247,13 +241,12 @@ Cancer-Diagnosis-System/
 ├── frontend/                  # React app
 │   └── src/
 │       ├── api/client.js      # The only place that calls the server
-│       ├── state/AppState.jsx # App state (Context + useReducer)
-│       ├── styles/            # tokens.css, global.css
-│       ├── components/        # Shell (navigation), ModelCard, FinalResult, Explain, Risk, Tour, …
-│       ├── screens/           # Home, Start, AddPatient, CheckRisk, Accuracy, WaitingList,
-│       │                      # PatientReport, LinkedList, HashTable
-│       ├── hooks/useRiskRun.js # Runs Check risk and its step-by-step animation
-│       └── lib/               # metrics.js, format.js, models.js, hash.js, tour.js
+│       ├── state/Journey.jsx  # Journey progress, locks, toasts (saved as cds.journey.v1)
+│       ├── styles/            # tokens.css (Night Metro palette), global.css
+│       ├── components/        # MetroDiagram, MetroBar, StationLayout, Tabs, Drawer, SplitFlap, …
+│       ├── screens/           # Landing, MapPage
+│       ├── stations/          # Data, Features, Scale, Split, Train, Predict (+ predict/), Evaluate, Benchmark
+│       └── lib/               # metro.js (stations and lines), geometry.js, hash.js (BigInt hash), …
 ├── docs/
 │   ├── API.md                 # Every endpoint with request and response
 │   ├── DSA.md                 # Data structures, complexities, benchmark results
@@ -365,10 +358,12 @@ Every patient needs at least one gene, and every ID must exist in the other two 
 
 | | |
 |---|---|
-| ![Home: three steps, each ticked off when done](docs/screenshots/home.png) | ![Add patient: gene scores with sliders and a live average](docs/screenshots/add-patient.png) |
-| ![Why this result for KNN: the most similar genes vote](docs/screenshots/why-knn.png) | ![Why this result for Logistic Regression: the S-shaped curve](docs/screenshots/why-logistic.png) |
-| ![Model accuracy: ranked bars and results in words](docs/screenshots/model-accuracy.png) | ![Patient list: searching the linked list one patient at a time](docs/screenshots/linked-list.png) |
-| ![Gene lookup: the formula jumps straight to the right box](docs/screenshots/hash-table.png) | ![Check risk on a phone](docs/screenshots/mobile-check-risk.png) |
+| ![Landing page: the headline and the metro line drawing itself](docs/screenshots/landing.png) | ![Data: the sample dataset loaded and the patient table](docs/screenshots/data.png) |
+| ![Features: one patient's genes turned into four numbers](docs/screenshots/features.png) | ![Scale: four rulers on the same −3 to +3 scale](docs/screenshots/scale.png) |
+| ![Split: 320 training and 80 test patients with the same cancer share](docs/screenshots/split.png) | ![Train: the KNN KD-tree, top four levels](docs/screenshots/train.png) |
+| ![Predict: four model bars, the 50% cancer line and the vote](docs/screenshots/predict.png) | ![Predict: the similarity graph with a breadth-first search wave](docs/screenshots/predict-graph.png) |
+| ![Evaluate: ROC curves of the four models with AUC](docs/screenshots/evaluate.png) | ![Benchmark: the departure board, simple way vs our structure](docs/screenshots/benchmark.png) |
+| ![The map on a phone: stations top to bottom](docs/screenshots/mobile-map.png) | ![Predict on a phone](docs/screenshots/mobile-predict.png) |
 
 ## 📝 License
 
