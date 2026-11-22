@@ -1,0 +1,72 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.formula {
+  font-size: var(--t20);
+  padding: 6px 12px;
+  border-radius: var(--r);
+  background: var(--platform);
+}
+
+.caption {
+  font-weight: 600;
+  min-height: 1.6em;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+}
+
+.grid {
+  stroke: var(--border);
+}
+
+.zero {
+  stroke: var(--ink-muted);
+  stroke-dasharray: 4 4;
+}
+
+.tick {
+  fill: var(--ink-muted);
+  font-size: 13px;
+}
+
+.ruler {
+  stroke: var(--rail-soft);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.rowName {
+  fill: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.rowStats {
+  fill: var(--ink-muted);
+  font-size: 13px;
+}
+
+.dot {
+  fill: var(--ink);
+  fill-opacity: 0.45;
+}
+
+.note {
+  font-weight: 600;
+}

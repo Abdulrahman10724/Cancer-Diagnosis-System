@@ -87,3 +87,13 @@
   --shadow-float: 0 2px 4px rgba(18, 26, 43, 0.06), 0 12px 32px rgba(18, 26, 43, 0.14);
   --ease: cubic-bezier(0.22, 0.8, 0.3, 1);
 }
+
+:root {
+  /* Diagnosis (data, not outcome): dark ink vs grey, always with a legend */
+  --dx-cancer: #121A2B;
+  --dx-clear: #8A93A6;
+  /* Correlation heatmap: muted diverging pair with a grey midpoint */
+  --div-neg: #2F6690;
+  --div-mid: #EEF0F3;
+  --div-pos: #A8432F;
+}

@@ -1,3 +1,6 @@
+import Data from './Data';
+import Features from './Features';
+import Scale from './Scale';
 import Placeholder from './Placeholder';
 
 const make = (id) =>
@@ -6,9 +9,9 @@ const make = (id) =>
   };
 
 export const STATION_SCREENS = {
-  data: make('data'),
-  features: make('features'),
-  scale: make('scale'),
+  data: Data,
+  features: Features,
+  scale: Scale,
   split: make('split'),
   train: make('train'),
   predict: make('predict'),

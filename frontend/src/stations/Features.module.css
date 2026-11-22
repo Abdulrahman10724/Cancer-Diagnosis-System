@@ -1,0 +1,273 @@
+.one {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  margin: var(--s1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gene {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--pill);
+  font-size: var(--t15);
+}
+
+.geneHigh {
+  border-color: var(--ink);
+  border-width: 2px;
+}
+
+.highTag {
+  color: var(--ink-muted);
+  font-size: var(--t13);
+}
+
+.arrowDown {
+  width: 4px;
+  height: 28px;
+  margin-left: 24px;
+  border-radius: var(--pill);
+  background: var(--rail);
+}
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s2);
+  margin: 0;
+}
+
+.counter {
+  padding: var(--s2);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--ink);
+  border-radius: var(--r);
+}
+
+.counterName {
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+}
+
+.counterName :global(.mono) {
+  font-size: var(--t13);
+  font-weight: 400;
+}
+
+.counterValue {
+  margin: var(--s1) 0 0;
+  font-size: var(--t40);
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.counterDef {
+  margin: var(--s1) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--t15);
+}
+
+/* Charts */
+.groups,
+.corr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.chartTitle {
+  font-weight: 600;
+}
+
+.chartTitle span {
+  font-weight: 700;
+}
+
+.chartWrap {
+  position: relative;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+}
+
+.grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.axis {
+  stroke: var(--ink-muted);
+  stroke-width: 1;
+}
+
+.tick {
+  fill: var(--ink-muted);
+  font-size: 13px;
+}
+
+.axisTitle {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.band {
+  fill: transparent;
+}
+
+.hoverBand {
+  fill: var(--tint);
+}
+
+.barCancer {
+  fill: var(--dx-cancer);
+}
+
+.barClear {
+  fill: var(--dx-clear);
+}
+
+.tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  font-size: var(--t13);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tooltip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Heatmap */
+.corrLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) 1fr;
+  gap: var(--s4);
+  align-items: start;
+}
+
+.heat {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+}
+
+.cellG {
+  outline: none;
+  cursor: default;
+}
+
+.cellOn,
+.cellG:focus-visible rect {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.cellText,
+.cellTextLight {
+  font-size: 17px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.cellText {
+  fill: var(--ink);
+}
+
+.cellTextLight {
+  fill: #fff;
+}
+
+.heatLabel {
+  fill: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.corrSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.scaleKey {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 240px;
+}
+
+.scaleBar {
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--div-neg), var(--div-mid), var(--div-pos));
+}
+
+.scaleTicks {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--t13);
+  color: var(--ink-muted);
+}
+
+.reading {
+  font-weight: 700;
+  min-height: 1.6em;
+}
+
+@media (max-width: 860px) {
+  .counters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .corrLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .counterValue {
+    font-size: var(--t28);
+  }
+}

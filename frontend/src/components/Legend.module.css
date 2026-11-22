@@ -1,0 +1,36 @@
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px var(--s3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--t15);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cancer,
+.clear {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.cancer {
+  background: var(--dx-cancer);
+}
+
+.clear {
+  background: var(--dx-clear);
+}
+
+.model {
+  flex: none;
+}

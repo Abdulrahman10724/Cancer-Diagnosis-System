@@ -1,0 +1,61 @@
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.box {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+}
+
+.input::placeholder {
+  color: var(--ink-muted);
+}
+
+.list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.option {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: var(--s1);
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.active {
+  background: var(--tint);
+}
+
+.pid {
+  font-weight: 700;
+}
+
+.meta {
+  color: var(--ink-muted);
+  font-size: var(--t15);
+}
+
+.none {
+  padding: 8px 10px;
+  color: var(--ink-muted);
+}
