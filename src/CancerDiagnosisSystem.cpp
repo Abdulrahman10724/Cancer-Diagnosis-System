@@ -107,6 +107,7 @@ void CancerDiagnosisSystem::refreshRisks() {
 bool CancerDiagnosisSystem::areModelsTrained() const { return models.trained; }
 const ModelSet& CancerDiagnosisSystem::getModels() const { return models; }
 size_t CancerDiagnosisSystem::getLabelledCount() const { return trainPatients.size(); }
+const std::vector<const Patient*>& CancerDiagnosisSystem::getTrainPatients() const { return trainPatients; }
 
 // ---------------------------------------------------------------- patients
 
@@ -322,7 +323,8 @@ bool CancerDiagnosisSystem::diagnose(const Patient& patient, int k, Diagnosis& o
     out.risk[ModelSet::LOGISTIC] = models.logistic.predictProbabilitySingle(out.scaled);
 
     // KNN: K nearest labelled patients in the standardized space
-    auto nearest = models.knn.findNeighbors(out.scaled, k);
+    long visited = 0;
+    auto nearest = models.knn.findNeighbors(out.scaled, k, KNNClassifier::KD_TREE, &visited);
     out.k = static_cast<int>(nearest.size());
     out.neighbors.clear();
     out.votesCancer = 0;
@@ -335,7 +337,7 @@ bool CancerDiagnosisSystem::diagnose(const Patient& patient, int k, Diagnosis& o
         if (y[n.second] == 1) out.votesCancer++;
         else out.votesSafe++;
     }
-    out.kdNodesVisited = static_cast<long>(trainPatients.size()); // brute force scans every row
+    out.kdNodesVisited = visited;
     out.risk[ModelSet::KNN] = nearest.empty() ? 0.0 : static_cast<double>(out.votesCancer) / nearest.size();
 
     // Decision tree: the questions on the way to the leaf

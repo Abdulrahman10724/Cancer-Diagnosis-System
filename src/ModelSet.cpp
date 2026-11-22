@@ -41,15 +41,8 @@ double ModelSet::riskScaled(int model, const std::vector<double>& row, int k) co
     switch (model) {
         case LOGISTIC:
             return logistic.predictProbabilitySingle(row);
-        case KNN: {
-            auto neighbors = knn.findNeighbors(row, k);
-            if (neighbors.empty()) return 0.0;
-            int cancer = 0;
-            for (const auto& n : neighbors) {
-                if (knn.getTrainingLabel(n.second) == 1) cancer++;
-            }
-            return static_cast<double>(cancer) / neighbors.size();
-        }
+        case KNN:
+            return knn.predictProbabilitySingle(row, k);
         case DECISION_TREE:
             return tree.predictProbabilitySingle(row);
         case NAIVE_BAYES:

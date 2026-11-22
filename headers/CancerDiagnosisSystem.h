@@ -172,6 +172,7 @@ public:
     bool areModelsTrained() const;
     const ModelSet& getModels() const;
     size_t getLabelledCount() const;
+    const std::vector<const Patient*>& getTrainPatients() const; // row i of the training matrix
 
     // Patients (linked list)
     size_t getPatientCount() const;

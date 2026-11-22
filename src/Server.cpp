@@ -214,6 +214,26 @@ string diagnoseAllJson(const Patient& p, const Diagnosis& d) {
     return ss.str();
 }
 
+string kdNodeJson(const KDTree& tree, const DataPreprocessor& scaler, const std::vector<const Patient*>& rows,
+                  int node, int depth, int maxDepth) {
+    if (node < 0) return "null";
+    const KDTree::Node& n = tree.getNodes()[static_cast<size_t>(node)];
+    std::ostringstream ss;
+    ss << "{\"axis\":" << n.axis << ",\"feature\":" << jsonString(FeatureExtractor::featureNames()[static_cast<size_t>(n.axis)])
+       << ",\"split\":" << jsonNumber(n.split)
+       << ",\"splitRaw\":" << jsonNumber(scaler.inverseValue(static_cast<size_t>(n.axis), n.split))
+       << ",\"size\":" << n.size
+       << ",\"patient_id\":" << (n.point < rows.size() ? jsonString(rows[n.point]->getPatientId()) : "null");
+    if (depth + 1 < maxDepth) {
+        ss << ",\"left\":" << kdNodeJson(tree, scaler, rows, n.left, depth + 1, maxDepth)
+           << ",\"right\":" << kdNodeJson(tree, scaler, rows, n.right, depth + 1, maxDepth);
+    } else {
+        ss << ",\"truncated\":" << ((n.left >= 0 || n.right >= 0) ? "true" : "false");
+    }
+    ss << "}";
+    return ss.str();
+}
+
 } // namespace
 
 int serverMain() {
@@ -523,6 +543,27 @@ int serverMain() {
                << ",\"status\":\"processed\"}";
         }
         ss << "],\"patientCount\":" << system.getPatientCount() << "}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /kdtree?depth=4 -> the KNN k-d tree down to the given depth
+    svr.Get("/kdtree", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        long depth = 4;
+        if (req.has_param("depth") && (!parseIntParam(req.get_param_value("depth"), depth) || depth < 1 || depth > 12)) {
+            sendError(res, 400, "depth must be a whole number from 1 to 12");
+            return;
+        }
+        if (!system.areModelsTrained()) {
+            sendError(res, 400, "Load data first");
+            return;
+        }
+        const KDTree& tree = system.getModels().knn.getTree();
+        std::ostringstream ss;
+        ss << "{\"points\":" << tree.size() << ",\"dimensions\":" << tree.getDimensions()
+           << ",\"height\":" << tree.height() << ",\"depth\":" << depth
+           << ",\"root\":" << kdNodeJson(tree, system.getModels().scaler, system.getTrainPatients(),
+                                          tree.getRoot(), 0, static_cast<int>(depth)) << "}";
         sendJson(res, 200, ss.str());
     });
 

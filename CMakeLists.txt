@@ -21,6 +21,7 @@ add_library(cds_core STATIC
     src/FeatureExtractor.cpp
     src/HashMapper.cpp
     src/Json.cpp
+    src/KDTree.cpp
     src/KNNClassifier.cpp
     src/LogisticRegressionModel.cpp
     src/ModelSet.cpp
