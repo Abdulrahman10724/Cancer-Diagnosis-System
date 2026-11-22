@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { useAppState } from '../state/AppState';
 import Drawer from './Drawer';
+import Tour from './Tour';
+import { tourSeen } from '../lib/tour';
 import styles from './Shell.module.css';
 
 const MAIN = [
@@ -33,6 +35,22 @@ const HOW = [
   { to: '/hash-table', label: 'Gene lookup (hash table)', icon: Grid3x3 },
 ];
 const START = { to: '/start', label: 'Start / Settings', icon: Settings, tour: 'start' };
+
+// First visit: open the guided tour once the page has rendered.
+// Home can reopen it with the "cds:tour" event.
+function useTour() {
+  const [tourOpen, setTourOpen] = useState(false);
+  useEffect(() => {
+    const t = tourSeen() ? null : setTimeout(() => setTourOpen(true), 600);
+    const reopen = () => setTourOpen(true);
+    window.addEventListener('cds:tour', reopen);
+    return () => {
+      if (t) clearTimeout(t);
+      window.removeEventListener('cds:tour', reopen);
+    };
+  }, []);
+  return { tourOpen, setTourOpen };
+}
 
 function NavItem({ item, onClick }) {
   const Icon = item.icon;
@@ -277,6 +295,7 @@ function Toasts() {
 
 export default function Shell({ children }) {
   const [activity, setActivity] = useState(false);
+  const { tourOpen, setTourOpen } = useTour();
   return (
     <div className={styles.shell}>
       <a className={styles.skip} href="#main">
@@ -292,6 +311,7 @@ export default function Shell({ children }) {
       </div>
       <BottomTabs />
       <ActivityPanel open={activity} onClose={() => setActivity(false)} />
+      <Tour open={tourOpen} onClose={() => setTourOpen(false)} />
       <Toasts />
     </div>
   );

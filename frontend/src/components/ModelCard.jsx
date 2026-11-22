@@ -83,7 +83,7 @@ export default function ModelCard({ model, data, state, index, genes, onWhy, k, 
         <Help term={model.name}>{model.idea}</Help>
       </header>
 
-      {state === 'waiting' && <p className={styles.waiting}>Waiting for a patient.</p>}
+      {state === 'waiting' && <p className={styles.waiting}>Ready. Press Check risk.</p>}
       {state === 'reading' && <GeneChips genes={genes} index={index} />}
       {state === 'analyzing' && (
         <div className={styles.analyzing}>

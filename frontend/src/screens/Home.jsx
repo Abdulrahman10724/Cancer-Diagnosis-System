@@ -117,6 +117,12 @@ export default function Home() {
       <section className={styles.learn} aria-labelledby="learn-heading">
         <h2 id="learn-heading">Want to see how it works inside?</h2>
         <p>
+          New here?{' '}
+          <button type="button" className="btn btn-quiet" onClick={() => window.dispatchEvent(new Event('cds:tour'))}>
+            Take the tour
+          </button>
+        </p>
+        <p>
           <Link to="/accuracy">Model accuracy</Link> shows how often each model is right.{' '}
           <Link to="/linked-list">Patient list</Link> and <Link to="/hash-table">Gene lookup</Link>{' '}
           show the two data structures the program uses to store patients and genes.
