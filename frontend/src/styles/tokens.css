@@ -1,53 +1,44 @@
 /*
- * Pathology Bench design tokens.
+ * Design tokens.
  *
- * Model colours identify models only; outcome colours (--safe, --risk) identify
- * outcomes only. Never mix the two.
+ * Risk colours (--low, --medium, --high) mark risk and right/wrong only.
+ * Model colours (--lr, --knn, --dt, --nb) identify models only and always appear
+ * next to the model's name as text.
  *
- * Palette validation (dataviz validate_palette.js):
- *   Light, surface #FFFFFF / #F5F7F8 - #6A3FA0, #C98A00, #D0457E, #0089B0:
- *     lightness, chroma, CVD (worst dE 10.7) and normal-vision (worst dE 22.0) PASS.
- *     Contrast WARN for amber (#C98A00 = 2.95:1 on white) -> every band, lane, plate
- *     and legend prints the model name as text.
- *   Gel, surface #2B3036 - the light stains FAIL the dark lightness band, so the gel
- *   uses lighter steps of the same hues (OKLCH L 0.60-0.665):
- *     #A47BE1, #C48600, #E75A91, #31A1C9 -> all checks PASS, every colour >= 3:1
- *     (worst CVD dE 10.4 deutan, normal-vision dE 20.3).
+ * Contrast (checked with the dataviz validator's contrast()):
+ *   --low #1E9E6A is 3.41:1 and --medium #D99100 is 2.62:1 on white, so they are
+ *   used for bars, icons and fills only. Risk words use the -ink shades:
+ *   --low-ink #13724C 5.93:1, --medium-ink #8A5C00 5.81:1, --high-ink #B42323 6.55:1
+ *   on white (5.3:1 or more on their tints).
+ *   Model colours on white: lightness, chroma, colour-blind and normal-vision
+ *   separation PASS; --knn amber is 2.95:1, so its name is always printed beside it.
  */
 :root {
-  /* Surfaces and ink */
-  --slide: #F5F7F8;
-  --paper: #FFFFFF;
-  --ink: #1E2329;
-  --ink-muted: #5B6470;
-  --rule: #D9DEE3;
-  --rule-strong: #AEB6BF;
+  --bg: #F6F8FB;
+  --surface: #FFFFFF;
+  --text: #18212F;
+  --muted: #5A6577;
+  --border: #E3E8EF;
+  --border-strong: #C5CDD8;
 
-  /* Gel bench (dark surface, gel only) */
-  --bench: #2B3036;
-  --bench-deep: #23272C;
-  --bench-ink: #E8EBEE;
-  --bench-ink-muted: #A9B0B8;
-  --bench-rule: #4A525B;
+  --primary: #2D5BFF;
+  --primary-hover: #1F47D6;
+  --primary-tint: #EBF0FF;
 
-  /* Model stains on light surfaces */
-  --stain-lr: #6A3FA0;
-  --stain-knn: #C98A00;
-  --stain-dt: #D0457E;
-  --stain-nb: #0089B0;
+  --low: #1E9E6A;
+  --medium: #D99100;
+  --high: #D93A3A;
+  --low-ink: #13724C;
+  --medium-ink: #8A5C00;
+  --high-ink: #B42323;
+  --low-tint: #E8F6F0;
+  --medium-tint: #FDF3DF;
+  --high-tint: #FCEBEB;
 
-  /* Model stains on the gel (validated against --bench) */
-  --gel-lr: #A47BE1;
-  --gel-knn: #C48600;
-  --gel-dt: #E75A91;
-  --gel-nb: #31A1C9;
-  --gel-consensus: #C9CED4;
-
-  /* Outcomes */
-  --safe: #2E7D5B;
-  --risk: #B3261E;
-  --safe-tint: #EEF6F2; /* 4.55:1 with --safe text */
-  --risk-tint: #F7E4E2;
+  --lr: #6A3FA0;
+  --knn: #C98A00;
+  --dt: #D0457E;
+  --nb: #0089B0;
 
   /* Type scale (rem) */
   --text-xs: 0.8125rem;
@@ -55,10 +46,9 @@
   --text-md: 1.0625rem;
   --text-lg: 1.375rem;
   --text-xl: 1.875rem;
-  --text-2xl: 2.625rem;
+  --text-2xl: 2.5rem;
 
   --font-ui: 'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', system-ui, sans-serif;
-  --font-barcode: 'Libre Barcode 128 Text', var(--font-ui);
 
   /* 8px spacing grid */
   --s1: 8px;
@@ -69,9 +59,42 @@
   --s6: 48px;
   --s8: 64px;
 
-  --radius-control: 2px;
-  --content-max: 1200px;
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --shadow-raised: 0 1px 2px rgba(24, 33, 47, 0.06), 0 8px 24px rgba(24, 33, 47, 0.08);
+  --shadow-panel: -12px 0 32px rgba(24, 33, 47, 0.16);
+  --focus: 2px solid var(--primary);
+
+  --sidebar-width: 256px;
+  --content-max: 1120px;
+  --tabbar-height: 64px;
+
+  /* Legacy names used by screens not yet redesigned (removed when they are) */
+  --slide: var(--bg);
+  --paper: var(--surface);
+  --ink: var(--text);
+  --ink-muted: var(--muted);
+  --rule: var(--border);
+  --rule-strong: var(--border-strong);
+  --bench: #2B3036;
+  --bench-deep: #23272C;
+  --bench-ink: #E8EBEE;
+  --bench-ink-muted: #A9B0B8;
+  --bench-rule: #4A525B;
+  --stain-lr: var(--lr);
+  --stain-knn: var(--knn);
+  --stain-dt: var(--dt);
+  --stain-nb: var(--nb);
+  --gel-lr: #A47BE1;
+  --gel-knn: #C48600;
+  --gel-dt: #E75A91;
+  --gel-nb: #31A1C9;
+  --gel-consensus: #C9CED4;
+  --safe: var(--low-ink);
+  --risk: var(--high-ink);
+  --safe-tint: var(--low-tint);
+  --risk-tint: var(--high-tint);
+  --font-barcode: var(--font-ui);
+  --drawer-shadow: var(--shadow-panel);
   --notebook-width: 288px;
-  --focus: 2px solid var(--ink);
-  --drawer-shadow: -8px 0 24px rgba(30, 35, 41, 0.14);
 }

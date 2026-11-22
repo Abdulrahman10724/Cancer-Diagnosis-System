@@ -4,8 +4,9 @@ import styles from './Drawer.module.css';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-// Right-side drawer. Traps focus while open, closes on Esc, returns focus on close.
-export default function Drawer({ open, title, onClose, children }) {
+// Side panel (right) or sheet (bottom). Traps focus while open, closes on Esc,
+// returns focus on close.
+export default function Drawer({ open, title, onClose, children, side = 'right', headerExtra }) {
   const panelRef = useRef(null);
   const returnFocusRef = useRef(null);
   const reduceMotion = useReducedMotion();
@@ -58,22 +59,25 @@ export default function Drawer({ open, title, onClose, children }) {
           />
           <motion.div
             ref={panelRef}
-            className={styles.panel}
+            className={`${styles.panel} ${side === 'bottom' ? styles.bottom : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="drawer-title"
-            initial={reduceMotion ? false : { x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { x: 40, opacity: 0 }}
+            initial={reduceMotion ? false : side === 'bottom' ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
+            animate={{ x: 0, y: 0, opacity: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : side === 'bottom' ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.22, ease: 'easeOut' }}
           >
             <div className={styles.header}>
               <h2 id="drawer-title" className={styles.title}>
                 {title}
               </h2>
-              <button type="button" className="btn" onClick={onClose}>
-                Close
-              </button>
+              <div className={styles.actions}>
+                {headerExtra}
+                <button type="button" className="btn" onClick={onClose}>
+                  Close
+                </button>
+              </div>
             </div>
             <div className={styles.body}>{children}</div>
           </motion.div>

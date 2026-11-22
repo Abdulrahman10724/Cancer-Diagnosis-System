@@ -1,6 +1,6 @@
 @import '@fontsource/atkinson-hyperlegible-next/400.css';
 @import '@fontsource/atkinson-hyperlegible-next/600.css';
-@import '@fontsource/libre-barcode-128-text/400.css';
+@import '@fontsource/atkinson-hyperlegible-next/700.css';
 @import './tokens.css';
 
 *,
@@ -15,8 +15,8 @@ html {
 
 body {
   margin: 0;
-  background: var(--slide);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-ui);
   font-size: var(--text-md);
   line-height: 1.5;
@@ -26,8 +26,8 @@ body {
 
 h1, h2, h3, h4 {
   margin: 0;
-  font-weight: 600;
-  line-height: 1.25;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 h1 { font-size: var(--text-xl); }
@@ -53,7 +53,7 @@ textarea {
 }
 
 a {
-  color: inherit;
+  color: var(--primary);
 }
 
 table {
@@ -73,67 +73,78 @@ table {
   border: 0;
 }
 
-/* Shared control styles */
+/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s1);
   min-height: 44px;
-  padding: 0 var(--s2);
-  border: 1px solid var(--ink);
+  padding: 0 18px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--surface);
+  color: var(--text);
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 
 .btn:hover {
-  background: var(--slide);
+  border-color: var(--text);
 }
 
 .btn-primary {
-  background: var(--ink);
-  color: var(--paper);
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
 }
 
 .btn-primary:hover {
-  background: #343B43;
+  border-color: var(--primary-hover);
+  background: var(--primary-hover);
+}
+
+.btn-large {
+  min-height: 52px;
+  padding: 0 24px;
+  font-size: var(--text-md);
 }
 
 .btn:disabled {
-  border-color: var(--rule-strong);
-  background: var(--slide);
-  color: var(--ink-muted);
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--muted);
   cursor: not-allowed;
 }
 
 .btn-quiet {
   border-color: transparent;
   background: transparent;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  padding: 0 var(--s1);
+  color: var(--primary);
+  padding: 0 10px;
+}
+
+.btn-quiet:hover {
+  border-color: transparent;
+  background: var(--primary-tint);
 }
 
 .btn-quiet:disabled {
   border-color: transparent;
   background: transparent;
-  text-decoration: none;
 }
 
-.btn-quiet:hover {
-  background: transparent;
-  text-decoration-thickness: 2px;
-}
-
+/* Form fields */
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
-.field label {
+.field label,
+.field .label {
   font-size: var(--text-sm);
   font-weight: 600;
 }
@@ -142,29 +153,29 @@ table {
 .select {
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
-  background: var(--paper);
+  background: var(--surface);
 }
 
 .input:focus-visible,
 .select:focus-visible {
   outline: var(--focus);
   outline-offset: 0;
-  border-color: var(--ink);
+  border-color: var(--primary);
 }
 
 .input[aria-invalid='true'] {
-  border-color: var(--risk);
+  border-color: var(--high-ink);
 }
 
 .field-error {
-  color: var(--risk);
+  color: var(--high-ink);
   font-size: var(--text-sm);
 }
 
 .hint {
-  color: var(--ink-muted);
+  color: var(--muted);
   font-size: var(--text-sm);
 }
 
@@ -178,6 +189,7 @@ table {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 

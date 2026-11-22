@@ -11,7 +11,8 @@
 
 .barcode {
   font-family: var(--font-barcode);
-  font-size: 2.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
   line-height: 1;
   color: var(--ink);
   white-space: nowrap;
@@ -42,7 +43,7 @@
 }
 
 .compact .barcode {
-  font-size: 1.75rem;
+  font-size: 1rem;
 }
 
 .compact .meta {

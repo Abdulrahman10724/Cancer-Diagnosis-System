@@ -1,17 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
+import { api } from '../api/client';
+import { clock } from '../lib/format';
 
-const NOTEBOOK_KEY = 'pathology-bench.notebook';
+const ACTIVITY_KEY = 'cds.activity';
 
-function readNotebook() {
+function readActivity() {
   try {
-    const saved = window.sessionStorage.getItem(NOTEBOOK_KEY);
+    const saved = window.sessionStorage.getItem(ACTIVITY_KEY);
     return saved ? JSON.parse(saved) : [];
   } catch {
     return [];
   }
 }
-import { api } from '../api/client';
-import { clock } from '../lib/format';
 
 const AppStateContext = createContext(null);
 
@@ -23,10 +23,17 @@ const initialState = {
   patients: [],
   genes: [],
   dataError: null,
-  notebook: readNotebook(),
-  // Patients loaded into the gel wells (max 3) and their latest results
+  activity: readActivity(),
+  // The patient the user is working with (Home step 2)
+  selectedPatient: null,
+  // Latest "all models" result per patient ID (Home step 3, report)
+  results: {},
+  toasts: [],
+  // LEGACY: used by the old gel screen until it is replaced
   gelSlots: [],
 };
+
+let toastId = 0;
 
 function reducer(state, action) {
   switch (action.type) {
@@ -41,11 +48,21 @@ function reducer(state, action) {
     case 'log':
       return {
         ...state,
-        notebook: [
-          ...state.notebook,
-          { id: (state.notebook.at(-1)?.id || 0) + 1, time: clock(), text: action.text },
+        activity: [
+          ...state.activity,
+          { id: (state.activity.at(-1)?.id || 0) + 1, time: clock(), text: action.text },
         ],
       };
+    case 'select-patient':
+      return { ...state, selectedPatient: action.id };
+    case 'result':
+      return { ...state, results: { ...state.results, [action.id]: action.result } };
+    case 'clear-results':
+      return { ...state, results: {} };
+    case 'toast':
+      return { ...state, toasts: [...state.toasts, { id: ++toastId, text: action.text, tone: action.tone }] };
+    case 'toast-done':
+      return { ...state, toasts: state.toasts.filter((t) => t.id !== action.id) };
     case 'gel-load':
       if (state.gelSlots.includes(action.id) || state.gelSlots.length >= 3) return state;
       return { ...state, gelSlots: [...state.gelSlots, action.id] };
@@ -60,6 +77,11 @@ export function AppStateProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const log = useCallback((text) => dispatch({ type: 'log', text }), []);
+  const toast = useCallback((text, tone = 'success') => dispatch({ type: 'toast', text, tone }), []);
+  const dismissToast = useCallback((id) => dispatch({ type: 'toast-done', id }), []);
+  const selectPatient = useCallback((id) => dispatch({ type: 'select-patient', id }), []);
+  const saveResult = useCallback((id, result) => dispatch({ type: 'result', id, result }), []);
+  const clearResults = useCallback(() => dispatch({ type: 'clear-results' }), []);
 
   // Read status, then patients and genes from the server (the only data source)
   const refresh = useCallback(async () => {
@@ -91,24 +113,30 @@ export function AppStateProvider({ children }) {
     return () => clearInterval(id);
   }, [state.server, refresh]);
 
-  // Keep the notebook for this browser session (lost only when the tab closes)
+  // Keep the activity list for this browser session
   useEffect(() => {
     try {
-      window.sessionStorage.setItem(NOTEBOOK_KEY, JSON.stringify(state.notebook));
+      window.sessionStorage.setItem(ACTIVITY_KEY, JSON.stringify(state.activity));
     } catch {
-      // Storage unavailable: the notebook still works for this page
+      // Storage unavailable: the list still works for this page
     }
-  }, [state.notebook]);
+  }, [state.activity]);
 
   const value = useMemo(
     () => ({
-      state,
+      state: { ...state, notebook: state.activity },
       refresh,
       log,
+      toast,
+      dismissToast,
+      selectPatient,
+      saveResult,
+      clearResults,
+      // LEGACY: old gel screen
       loadIntoGel: (id) => dispatch({ type: 'gel-load', id }),
       unloadFromGel: (id) => dispatch({ type: 'gel-unload', id }),
     }),
-    [state, refresh, log],
+    [state, refresh, log, toast, dismissToast, selectPatient, saveResult, clearResults],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

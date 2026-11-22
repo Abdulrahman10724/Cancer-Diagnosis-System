@@ -1,0 +1,19 @@
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  margin-bottom: var(--s4);
+}
+
+.purpose {
+  font-size: var(--text-lg);
+  color: var(--muted);
+  line-height: 1.35;
+  max-width: 60ch;
+}
+
+@media (max-width: 600px) {
+  .purpose {
+    font-size: var(--text-md);
+  }
+}

@@ -1,0 +1,90 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge svg {
+  flex: none;
+}
+
+.large {
+  padding: 6px 14px;
+  font-size: var(--text-lg);
+  gap: 8px;
+}
+
+.large svg {
+  width: 20px;
+  height: 20px;
+}
+
+.low {
+  background: var(--low-tint);
+  color: var(--low-ink);
+}
+
+.low svg {
+  color: var(--low);
+}
+
+.medium {
+  background: var(--medium-tint);
+  color: var(--medium-ink);
+}
+
+.medium svg {
+  color: var(--medium);
+}
+
+.high {
+  background: var(--high-tint);
+  color: var(--high-ink);
+}
+
+.high svg {
+  color: var(--high);
+}
+
+.barWrap {
+  position: relative;
+  width: 100%;
+}
+
+.track {
+  position: relative;
+  width: 100%;
+  border-radius: 999px;
+  background: #EDF0F5;
+  overflow: visible;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.line {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+
+.lineLabel {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 6px);
+  transform: translateX(-50%);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
