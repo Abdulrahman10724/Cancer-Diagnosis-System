@@ -101,6 +101,10 @@
   cursor: grabbing;
 }
 
+.results {
+  scroll-margin-top: var(--s2);
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;

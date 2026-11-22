@@ -1,4 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
+
+const NOTEBOOK_KEY = 'pathology-bench.notebook';
+
+function readNotebook() {
+  try {
+    const saved = window.sessionStorage.getItem(NOTEBOOK_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
 import { api } from '../api/client';
 import { clock } from '../lib/format';
 
@@ -12,7 +23,7 @@ const initialState = {
   patients: [],
   genes: [],
   dataError: null,
-  notebook: [],
+  notebook: readNotebook(),
   // Patients loaded into the gel wells (max 3) and their latest results
   gelSlots: [],
 };
@@ -30,7 +41,10 @@ function reducer(state, action) {
     case 'log':
       return {
         ...state,
-        notebook: [...state.notebook, { id: state.notebook.length + 1, time: clock(), text: action.text }],
+        notebook: [
+          ...state.notebook,
+          { id: (state.notebook.at(-1)?.id || 0) + 1, time: clock(), text: action.text },
+        ],
       };
     case 'gel-load':
       if (state.gelSlots.includes(action.id) || state.gelSlots.length >= 3) return state;
@@ -69,6 +83,22 @@ export function AppStateProvider({ children }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // While the server is offline, check again every 5 seconds
+  useEffect(() => {
+    if (state.server !== 'offline') return undefined;
+    const id = setInterval(refresh, 5000);
+    return () => clearInterval(id);
+  }, [state.server, refresh]);
+
+  // Keep the notebook for this browser session (lost only when the tab closes)
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(NOTEBOOK_KEY, JSON.stringify(state.notebook));
+    } catch {
+      // Storage unavailable: the notebook still works for this page
+    }
+  }, [state.notebook]);
 
   const value = useMemo(
     () => ({

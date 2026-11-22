@@ -46,7 +46,7 @@
   /* Outcomes */
   --safe: #2E7D5B;
   --risk: #B3261E;
-  --safe-tint: #E3F0EA;
+  --safe-tint: #EEF6F2; /* 4.55:1 with --safe text */
   --risk-tint: #F7E4E2;
 
   /* Type scale (rem) */

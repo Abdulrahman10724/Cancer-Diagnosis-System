@@ -116,6 +116,12 @@ table {
   padding: 0 var(--s1);
 }
 
+.btn-quiet:disabled {
+  border-color: transparent;
+  background: transparent;
+  text-decoration: none;
+}
+
 .btn-quiet:hover {
   background: transparent;
   text-decoration-thickness: 2px;

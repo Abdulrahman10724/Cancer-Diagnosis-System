@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DndContext,
@@ -10,6 +10,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { scaleLinear } from 'd3-scale';
+import { useReducedMotion } from 'framer-motion';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppState';
 import { modelByKey } from '../lib/models';
@@ -207,6 +208,16 @@ export default function Gel() {
   const [dragId, setDragId] = useState(null);
   const [drawer, setDrawer] = useState(null);
 
+  const gelRef = useRef(null);
+  const reduceMotion = useReducedMotion();
+
+  // After a run, bring the gel into view so the migration is seen
+  useEffect(() => {
+    if (runId > 0 && gelRef.current) {
+      gelRef.current.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    }
+  }, [runId, reduceMotion]);
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const slots = state.gelSlots;
   const full = slots.length >= 3;
@@ -385,7 +396,7 @@ export default function Gel() {
       )}
 
       {ran.length > 0 && (
-        <section className={screen.section} aria-labelledby="gel-heading">
+        <section ref={gelRef} className={`${screen.section} ${styles.results}`} aria-labelledby="gel-heading">
           <h2 id="gel-heading" className="visually-hidden">
             Gel results
           </h2>
