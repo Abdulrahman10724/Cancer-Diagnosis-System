@@ -1,0 +1,718 @@
+/* Shared by the four Predict tabs */
+.diagnose,
+.waiting,
+.find,
+.similar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.pickRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s2);
+}
+
+.pickActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+}
+
+.patientLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s1);
+  padding: var(--s1) var(--s2);
+  border-radius: var(--r);
+  background: var(--platform);
+}
+
+.undoRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+/* Diagnose result */
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.featureRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s2);
+  margin: 0;
+}
+
+.feature dt {
+  color: var(--ink-muted);
+  font-size: var(--t15);
+  font-weight: 600;
+}
+
+.feature dd {
+  margin: 0;
+  font-size: var(--t28);
+  font-weight: 800;
+}
+
+.models {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scaleHead,
+.modelRow {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 170px 72px;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.scaleHead {
+  color: var(--ink-muted);
+  font-size: var(--t13);
+}
+
+.scaleHead > span {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.scaleHead > span:first-child {
+  justify-self: start;
+}
+
+.cancerLineLabel {
+  justify-self: center;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.scaleHead > span:last-child {
+  justify-self: end;
+}
+
+.modelName {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.track {
+  position: relative;
+  height: 28px;
+  border-radius: 4px;
+  background: var(--platform);
+}
+
+.fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.cancerLine {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--risk);
+}
+
+.modelValue {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.pct {
+  font-size: var(--t20);
+  font-weight: 800;
+}
+
+.says {
+  color: var(--ink-muted);
+  font-size: var(--t13);
+}
+
+.verdictRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s2);
+  border-radius: var(--r);
+  background: var(--platform);
+}
+
+.votes {
+  font-size: var(--t17);
+}
+
+/* Why drawer */
+.why {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.whyTable {
+  width: 100%;
+  font-size: var(--t15);
+}
+
+.whyTable th,
+.whyTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.whyTable thead th {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.whyTable tfoot th,
+.whyTable tfoot td {
+  font-weight: 800;
+  border-bottom: 0;
+}
+
+.up {
+  font-weight: 700;
+}
+
+.down {
+  color: var(--ink-muted);
+}
+
+.whyResult {
+  font-size: var(--t20);
+  font-weight: 700;
+}
+
+.path {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.path li {
+  display: flex;
+  flex-direction: column;
+}
+
+.pathQ {
+  font-weight: 700;
+}
+
+/* Add patient */
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.geneRows {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s1);
+}
+
+.geneRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s1);
+  width: 100%;
+}
+
+.geneScore {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--t15);
+  color: var(--ink-muted);
+}
+
+.geneScore input {
+  accent-color: var(--ink);
+}
+
+.formError {
+  color: var(--risk-ink);
+  font-size: var(--t15);
+  font-weight: 600;
+}
+
+/* Waiting room */
+.lanes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  min-width: 0;
+}
+
+.laneTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--t20);
+}
+
+.laneTitle .muted {
+  font-size: var(--t15);
+  font-weight: 400;
+}
+
+.laneSwatch {
+  display: inline-block;
+  width: 24px;
+  height: 4px;
+  border-radius: var(--pill);
+}
+
+.laneList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.laneItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 6px 10px;
+  border-radius: var(--r);
+  background: var(--platform);
+  font-size: var(--t15);
+}
+
+.laneRank {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  font-size: var(--t13);
+  font-weight: 700;
+}
+
+.heap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+
+.heapSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+}
+
+.heapEdge {
+  stroke: var(--line-heap);
+  stroke-width: 2;
+}
+
+.heapNode,
+.heapTop {
+  fill: var(--surface);
+  stroke: var(--line-heap);
+  stroke-width: 2;
+}
+
+.heapTop {
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.heapId {
+  fill: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.heapRisk {
+  fill: var(--ink-muted);
+  font-size: 12px;
+}
+
+/* Find patients */
+.findBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.findBlock + .findBlock {
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.blockTitle {
+  font-size: var(--t20);
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+}
+
+.walks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+}
+
+.walk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  min-width: 0;
+}
+
+.walkTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.ticks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-height: 40px;
+  align-content: flex-start;
+}
+
+.tick {
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--rail);
+}
+
+.tickHit {
+  background: var(--ink);
+  width: 14px;
+}
+
+.walkCount {
+  font-size: var(--t17);
+}
+
+.walkCount strong {
+  font-size: var(--t28);
+  font-weight: 800;
+}
+
+.avlPath {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 40px;
+  align-content: flex-start;
+}
+
+.pathStep,
+.pathHit {
+  padding: 4px 10px;
+  border-radius: var(--pill);
+  border: 2px solid var(--line-avl);
+  font-size: var(--t13);
+  font-weight: 700;
+}
+
+.pathHit {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.compare {
+  font-size: var(--t20);
+  font-weight: 800;
+}
+
+.rangeRow,
+.graphControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s2) var(--s4);
+}
+
+.rangeLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.rangeLabel input {
+  accent-color: var(--ink);
+}
+
+.rangeList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 4px var(--s3);
+  font-size: var(--t15);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Similar patients */
+.graphLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--s3);
+  transition: opacity 0.2s;
+}
+
+.stale {
+  opacity: 0.55;
+}
+
+.graphMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.graphSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--r);
+  background: var(--platform);
+}
+
+.edge {
+  stroke: var(--rail-soft);
+  stroke-width: 0.8;
+}
+
+.edgeLit {
+  stroke: var(--line-graph);
+  stroke-width: 1.2;
+}
+
+.gnode {
+  fill: #c3c9d4;
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: fill 0.15s, opacity 0.15s;
+}
+
+.gCancer {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.gClear {
+  stroke: #fff;
+}
+
+.gUnknown {
+  stroke: var(--ink-muted);
+  stroke-dasharray: 2 2;
+}
+
+.gGroup {
+  fill: var(--ink-muted);
+}
+
+.gnodeLit {
+  fill: var(--line-graph);
+}
+
+.gnodeStart {
+  fill: var(--line-graph);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.gDim {
+  opacity: 0.2;
+}
+
+.keyCancer,
+.keyClear,
+.keyLit {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #c3c9d4;
+}
+
+.keyCancer {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.keyClear {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.keyLit {
+  background: var(--line-graph);
+}
+
+.graphSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.graphStats {
+  font-size: var(--t15);
+  color: var(--ink-muted);
+}
+
+.bfsLine {
+  font-weight: 600;
+}
+
+.sideTitle {
+  font-size: var(--t17);
+}
+
+.groupList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.groupBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupBtn:hover {
+  border-color: var(--ink);
+}
+
+.groupOn {
+  border-color: var(--ink);
+  background: var(--tint);
+}
+
+.groupName {
+  font-weight: 700;
+}
+
+@media (max-width: 960px) {
+  .scaleHead,
+  .modelRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .scaleHead {
+    display: none;
+  }
+
+  .modelName {
+    grid-column: 1 / -1;
+  }
+
+  .track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .featureRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lanes,
+  .walks,
+  .graphLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .geneRow {
+    grid-template-columns: 1fr auto;
+  }
+
+  .geneScore {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

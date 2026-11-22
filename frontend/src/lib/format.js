@@ -8,6 +8,9 @@ export function num(v, digits = 2) {
 export const int = (v) => Math.round(v).toLocaleString('en-US');
 
 export function featureValue(key, v) {
-  if (key === 'age' || key === 'highRiskGenes') return String(Math.round(v));
+  if (key === 'age' || key === 'highRiskGenes') {
+    const r = Math.round(v * 10) / 10;
+    return Number.isInteger(r) ? String(r) : r.toFixed(1);
+  }
   return num(v, 3);
 }

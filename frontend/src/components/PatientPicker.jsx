@@ -5,6 +5,7 @@ import styles from './PatientPicker.module.css';
 export default function PatientPicker({ patients, value, onChange, label = 'Patient' }) {
   const id = useId();
   const [text, setText] = useState('');
+  const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const input = useRef(null);
@@ -21,8 +22,10 @@ export default function PatientPicker({ patients, value, onChange, label = 'Pati
   const choose = (p) => {
     onChange(p.patient_id);
     setText('');
+    setEditing(false);
     setOpen(false);
   };
+  const shown = editing ? text : selected ? `${selected.patient_id}, ${selected.name}` : '';
 
   const onKey = (e) => {
     if (e.key === 'ArrowDown') {
@@ -55,15 +58,25 @@ export default function PatientPicker({ patients, value, onChange, label = 'Pati
           aria-controls={`${id}-list`}
           aria-autocomplete="list"
           aria-activedescendant={open && matches[active] ? `${id}-${matches[active].patient_id}` : undefined}
-          placeholder={selected ? `${selected.patient_id}, ${selected.name}` : 'Type an ID or a name, e.g. P004'}
-          value={text}
+          placeholder="Type an ID or a name, e.g. P004"
+          value={shown}
           onChange={(e) => {
             setText(e.target.value);
+            setEditing(true);
             setOpen(true);
             setActive(0);
           }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          onFocus={(e) => {
+            setOpen(true);
+            e.target.select();
+          }}
+          onBlur={() =>
+            window.setTimeout(() => {
+              setOpen(false);
+              setEditing(false);
+              setText('');
+            }, 120)
+          }
           onKeyDown={onKey}
           autoComplete="off"
         />
