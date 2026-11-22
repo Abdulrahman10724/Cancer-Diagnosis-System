@@ -444,9 +444,7 @@ void CancerDiagnosisSystem::trainAllModels() {
     std::cout << "=========================\n" << std::endl;
 }
 
-std::vector<double> CancerDiagnosisSystem::extractFeatures(const Patient& patient) const {
-    std::vector<double> features;
-    
+double CancerDiagnosisSystem::rawFeature(const Patient& patient) const {
     // Extract mutation scores from patient's genetic data
     std::vector<double> mutationScores = patient.getMutationScores();
     
@@ -457,18 +455,22 @@ std::vector<double> CancerDiagnosisSystem::extractFeatures(const Patient& patien
             for (const auto& data : geneticDataArray) {
                 sum += data.getMutationScore();
             }
-            features.push_back(sum / geneticDataArray.size());
-        } else {
-            features.push_back(0.0);
+            return sum / geneticDataArray.size();
         }
-    } else {
-        // Use average mutation score
-        double sum = 0.0;
-        for (double score : mutationScores) {
-            sum += score;
-        }
-        features.push_back(sum / mutationScores.size());
+        return 0.0;
     }
+    
+    // Use average mutation score
+    double sum = 0.0;
+    for (double score : mutationScores) {
+        sum += score;
+    }
+    return sum / mutationScores.size();
+}
+
+std::vector<double> CancerDiagnosisSystem::extractFeatures(const Patient& patient) const {
+    std::vector<double> features;
+    features.push_back(rawFeature(patient));
     
     // Normalize features
     if (preprocessor.getIsFitted() && !features.empty()) {
@@ -508,6 +510,77 @@ double CancerDiagnosisSystem::diagnosePatient(const Patient& patient, ModelType 
         default:
             return 0.0;
     }
+}
+
+bool CancerDiagnosisSystem::explainPatient(const Patient& patient, int k,
+                                           DiagnosisExplanation& out) const {
+    if (!modelsTrained) {
+        return false;
+    }
+    
+    std::vector<double> features = extractFeatures(patient);
+    out.featureRaw = rawFeature(patient);
+    out.featureScaled = features[0];
+    out.scaleMean = preprocessor.getMean();
+    out.scaleStd = preprocessor.getStdDev();
+    out.geneCount = static_cast<int>(patient.getGeneticData().size());
+    
+    // Logistic Regression: z = w * x + b, risk = sigmoid(z)
+    out.lrWeight = logisticModel->getWeights()[0];
+    out.lrBias = logisticModel->getBias();
+    out.lrZ = out.lrWeight * features[0] + out.lrBias;
+    out.lrRisk = logisticModel->predictProbabilitySingle(features);
+    
+    // KNN: training row i is geneticDataArray[i] (prepareTrainingData keeps the order),
+    // so the raw score and gene ID come from there; the distance stays in scaled space.
+    auto neighbors = knnModel->findNeighbors(features, k);
+    out.k = static_cast<int>(neighbors.size());
+    out.neighbors.clear();
+    out.votesCancer = 0;
+    out.votesSafe = 0;
+    for (const auto& n : neighbors) {
+        const GeneticData& gene = geneticDataArray[n.second];
+        KnnNeighbor kn;
+        kn.geneId = gene.getGeneId();
+        kn.mutationScore = gene.getMutationScore();
+        kn.label = knnModel->getTrainingLabel(n.second);
+        kn.distance = n.first;
+        out.neighbors.push_back(kn);
+        if (kn.label == 1) out.votesCancer++; else out.votesSafe++;
+    }
+    out.knnRisk = out.neighbors.empty() ? 0.0
+        : static_cast<double>(out.votesCancer) / out.neighbors.size();
+    
+    // Decision Tree: path from root to leaf; leaf fraction is the risk
+    auto path = decisionTreeModel->getDecisionPath(features);
+    out.path.clear();
+    for (const auto& node : path) {
+        if (node->featureIndex == -1) break;
+        TreeStep step;
+        step.thresholdScaled = node->threshold;
+        step.threshold = node->threshold * out.scaleStd + out.scaleMean;
+        step.wentLeft = features[node->featureIndex] <= node->threshold;
+        step.positiveFraction = node->positiveFraction;
+        step.samples = node->sampleCount;
+        out.path.push_back(step);
+    }
+    out.leafPositiveFraction = path.back()->positiveFraction;
+    out.leafSamples = path.back()->sampleCount;
+    out.dtRisk = decisionTreeModel->predictProbabilitySingle(features);
+    
+    // Naive Bayes: per-class Gaussian on the scaled feature
+    auto prior = naiveBayesModel->getClassPrior();
+    auto mean = naiveBayesModel->getClassMean();
+    auto stdev = naiveBayesModel->getClassStd();
+    out.nbSafePrior = prior.count(0) ? prior[0] : 0.0;
+    out.nbCancerPrior = prior.count(1) ? prior[1] : 0.0;
+    out.nbSafeMean = mean.count(0) ? mean[0][0] : 0.0;
+    out.nbCancerMean = mean.count(1) ? mean[1][0] : 0.0;
+    out.nbSafeStd = stdev.count(0) ? stdev[0][0] : 1.0;
+    out.nbCancerStd = stdev.count(1) ? stdev[1][0] : 1.0;
+    out.nbRisk = naiveBayesModel->predictProbabilitySingle(features);
+    
+    return true;
 }
 
 int CancerDiagnosisSystem::predictPatient(const Patient& patient, ModelType model) {

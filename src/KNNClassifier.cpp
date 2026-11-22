@@ -25,31 +25,42 @@ double KNNClassifier::euclideanDistance(const std::vector<double>& a,
     return std::sqrt(sum);
 }
 
-std::vector<std::pair<double, int>> KNNClassifier::findKNearest(
-    const std::vector<double>& sample) const {
+std::vector<std::pair<double, size_t>> KNNClassifier::findNeighbors(
+    const std::vector<double>& sample, int kOverride) const {
     if (!isTrained) {
         throw std::runtime_error("Model not trained. Call fit() first.");
     }
     
-    std::vector<std::pair<double, int>> distances;
+    std::vector<std::pair<double, size_t>> distances;
     distances.reserve(X_train.size());
     
     // Calculate distances to all training samples
     for (size_t i = 0; i < X_train.size(); ++i) {
         double dist = euclideanDistance(sample, X_train[i]);
-        distances.push_back({dist, y_train[i]});
+        distances.push_back({dist, i});
     }
     
-    // Sort by distance
-    std::sort(distances.begin(), distances.end(), 
-              [](const std::pair<double, int>& a, const std::pair<double, int>& b) {
-                  return a.first < b.first;
-              });
+    // Sort by distance (row index breaks ties, so results are deterministic)
+    std::sort(distances.begin(), distances.end());
     
     // Return k nearest neighbors
-    size_t kActual = std::min(static_cast<size_t>(k), distances.size());
-    return std::vector<std::pair<double, int>>(distances.begin(), 
-                                               distances.begin() + kActual);
+    int kUsed = kOverride > 0 ? kOverride : k;
+    size_t kActual = std::min(static_cast<size_t>(kUsed), distances.size());
+    return std::vector<std::pair<double, size_t>>(distances.begin(), 
+                                                  distances.begin() + kActual);
+}
+
+int KNNClassifier::getTrainingLabel(size_t index) const {
+    return y_train.at(index);
+}
+
+std::vector<std::pair<double, int>> KNNClassifier::findKNearest(
+    const std::vector<double>& sample) const {
+    std::vector<std::pair<double, int>> neighbors;
+    for (const auto& n : findNeighbors(sample)) {
+        neighbors.push_back({n.first, y_train[n.second]});
+    }
+    return neighbors;
 }
 
 int KNNClassifier::majorityVote(const std::vector<std::pair<double, int>>& neighbors) const {

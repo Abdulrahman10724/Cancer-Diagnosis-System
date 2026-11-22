@@ -36,6 +36,8 @@ public:
     // Utility
     bool getIsTrained() const;
     std::map<int, double> getClassPrior() const;
+    std::map<int, std::vector<double>> getClassMean() const;
+    std::map<int, std::vector<double>> getClassStd() const;
 };
 
 #endif // NAIVE_BAYES_CLASSIFIER_H

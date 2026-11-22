@@ -115,7 +115,8 @@ std::shared_ptr<TreeNode> DecisionTreeClassifier::buildTree(
     
     auto node = std::make_shared<TreeNode>();
     
-    // Store fraction of positive samples (used as probability at leaf nodes)
+    // Store sample count and fraction of positive samples (used as probability at leaf nodes)
+    node->sampleCount = static_cast<int>(y.size());
     if (!y.empty()) {
         int positives = 0;
         for (int label : y) {
@@ -260,6 +261,22 @@ double DecisionTreeClassifier::predictProbabilitySingle(const std::vector<double
     }
     
     return predictSampleProbability(sample, root);
+}
+
+std::vector<std::shared_ptr<TreeNode>> DecisionTreeClassifier::getDecisionPath(
+    const std::vector<double>& sample) const {
+    if (!root) {
+        throw std::runtime_error("Model not trained. Call fit() first.");
+    }
+    
+    std::vector<std::shared_ptr<TreeNode>> path;
+    std::shared_ptr<TreeNode> node = root;
+    while (node) {
+        path.push_back(node);
+        if (node->featureIndex == -1) break;
+        node = (sample[node->featureIndex] <= node->threshold) ? node->left : node->right;
+    }
+    return path;
 }
 
 void DecisionTreeClassifier::setMaxDepth(int depth) {

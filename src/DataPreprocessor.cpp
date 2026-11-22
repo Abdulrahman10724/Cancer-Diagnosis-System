@@ -86,6 +86,14 @@ bool DataPreprocessor::getIsFitted() const {
     return isFitted;
 }
 
+double DataPreprocessor::getMean() const {
+    return mean;
+}
+
+double DataPreprocessor::getStdDev() const {
+    return stdDev;
+}
+
 void DataPreprocessor::reset() {
     mean = 0.0;
     stdDev = 0.0;

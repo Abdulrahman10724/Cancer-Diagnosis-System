@@ -32,6 +32,8 @@ public:
     
     // Utility
     bool getIsFitted() const;
+    double getMean() const;
+    double getStdDev() const;
     void reset();
 };
 

@@ -42,6 +42,57 @@ struct ModelEvaluation {
 };
 
 /**
+ * @struct KnnNeighbor
+ * @brief One training gene among the K nearest neighbours of a patient
+ */
+struct KnnNeighbor {
+    std::string geneId;
+    double mutationScore; // RAW score from genes.csv (not scaled)
+    int label;
+    double distance;      // distance in the SCALED feature space the model uses
+};
+
+/**
+ * @struct TreeStep
+ * @brief One decision on the path from the tree root to the leaf
+ */
+struct TreeStep {
+    double threshold;       // split threshold converted back to the raw score scale
+    double thresholdScaled; // split threshold in the scaled space the tree uses
+    bool wentLeft;          // true when feature <= threshold
+    double positiveFraction;
+    int samples;
+};
+
+/**
+ * @struct DiagnosisExplanation
+ * @brief Risk from all four models for one patient, with the numbers behind each
+ */
+struct DiagnosisExplanation {
+    double featureRaw;    // mean mutation score of the patient's genes (before scaling)
+    double featureScaled; // after standardization
+    double scaleMean;
+    double scaleStd;
+    int geneCount;
+
+    double lrRisk, lrWeight, lrBias, lrZ;
+
+    double knnRisk;
+    int k;
+    std::vector<KnnNeighbor> neighbors;
+    int votesCancer, votesSafe;
+
+    double dtRisk;
+    std::vector<TreeStep> path;
+    double leafPositiveFraction;
+    int leafSamples;
+
+    double nbRisk;
+    double nbSafeMean, nbSafeStd, nbSafePrior;
+    double nbCancerMean, nbCancerStd, nbCancerPrior;
+};
+
+/**
  * @class CancerDiagnosisSystem
  * @brief Main controller class for the cancer diagnosis system
  */
@@ -79,6 +130,7 @@ private:
     void prepareTrainingData();
     void trainAllModels();
     std::vector<double> extractFeatures(const Patient &patient) const;
+    double rawFeature(const Patient &patient) const;
 
 public:
     enum class ModelType
@@ -136,6 +188,9 @@ public:
     size_t getPatientCount() const;
     bool areModelsTrained() const;
     bool getPatientById(const std::string &patientId, Patient &outPatient) const;
+    // All four models for one patient with explanation data. k > 0 overrides
+    // the KNN K for this call only. Returns false if models are not trained.
+    bool explainPatient(const Patient &patient, int k, DiagnosisExplanation &out) const;
 
     // Data export
     std::vector<Patient> getAllPatients() const;

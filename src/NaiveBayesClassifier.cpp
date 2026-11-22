@@ -220,3 +220,11 @@ std::map<int, double> NaiveBayesClassifier::getClassPrior() const {
     return classPrior;
 }
 
+std::map<int, std::vector<double>> NaiveBayesClassifier::getClassMean() const {
+    return classMean;
+}
+
+std::map<int, std::vector<double>> NaiveBayesClassifier::getClassStd() const {
+    return classStd;
+}
+

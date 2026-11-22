@@ -267,9 +267,11 @@ int serverMain() {
     });
 
     // GET /diagnose?patient_id=P001&model=logistic
+    // GET /diagnose?patient_id=P001&model=logistic|knn|decision_tree|naive_bayes|all&k=5
+    // model=all returns all four models with the numbers behind each prediction.
+    // k (optional, odd 1-15) sets the KNN K for this request only.
     svr.Get(R"(/diagnose)", [&](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);
-        auto params = req.params;
         string pid;
         string modelStr = "logistic";
         if (req.has_param("patient_id")) pid = req.get_param_value("patient_id");
@@ -281,10 +283,76 @@ int serverMain() {
             return;
         }
 
+        int k = 0; // 0 = use the trained default
+        if (req.has_param("k")) {
+            try { k = stoi(req.get_param_value("k")); } catch(...) { k = -1; }
+            if (k < 1 || k > 15 || k % 2 == 0) {
+                res.status = 400;
+                res.set_content("{\"error\":\"k must be an odd number from 1 to 15\"}", "application/json");
+                return;
+            }
+        }
+
+        if (!system.areModelsTrained()) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Load data first\"}", "application/json");
+            return;
+        }
+
         Patient patient;
         if (!system.getPatientById(pid, patient)) {
             res.status = 404;
             std::ostringstream ss; ss << "{\"error\":\"Patient ID '" << json_escape(pid) << "' not found\"}";
+            res.set_content(ss.str(), "application/json");
+            return;
+        }
+
+        if (modelStr == "all") {
+            DiagnosisExplanation e;
+            system.explainPatient(patient, k, e);
+            const double threshold = 0.5;
+            auto pred = [&](double r) { return r >= threshold ? 1 : 0; };
+            int cancer = pred(e.lrRisk) + pred(e.knnRisk) + pred(e.dtRisk) + pred(e.nbRisk);
+
+            std::ostringstream ss;
+            ss << std::setprecision(6);
+            ss << "{\"patient_id\":\"" << json_escape(patient.getPatientId()) << "\""
+               << ",\"featureRaw\":" << e.featureRaw
+               << ",\"featureScaled\":" << e.featureScaled
+               << ",\"scale\":{\"mean\":" << e.scaleMean << ",\"std\":" << e.scaleStd << "}"
+               << ",\"geneCount\":" << e.geneCount
+               << ",\"threshold\":" << threshold
+               << ",\"models\":{";
+            ss << "\"logistic\":{\"risk\":" << e.lrRisk << ",\"prediction\":" << pred(e.lrRisk)
+               << ",\"explain\":{\"weight\":" << e.lrWeight << ",\"bias\":" << e.lrBias
+               << ",\"z\":" << e.lrZ << "}}";
+            ss << ",\"knn\":{\"risk\":" << e.knnRisk << ",\"prediction\":" << pred(e.knnRisk)
+               << ",\"k\":" << e.k << ",\"explain\":{\"neighbors\":[";
+            for (size_t i = 0; i < e.neighbors.size(); ++i) {
+                const auto& n = e.neighbors[i];
+                if (i) ss << ",";
+                // mutation_score is RAW (from genes.csv); distance is in the scaled space
+                ss << "{\"gene_id\":\"" << json_escape(n.geneId) << "\",\"mutation_score\":" << n.mutationScore
+                   << ",\"label\":" << n.label << ",\"distance\":" << n.distance << "}";
+            }
+            ss << "],\"votesCancer\":" << e.votesCancer << ",\"votesSafe\":" << e.votesSafe << "}}";
+            ss << ",\"decision_tree\":{\"risk\":" << e.dtRisk << ",\"prediction\":" << pred(e.dtRisk)
+               << ",\"explain\":{\"path\":[";
+            for (size_t i = 0; i < e.path.size(); ++i) {
+                const auto& st = e.path[i];
+                if (i) ss << ",";
+                // threshold is on the raw score scale; thresholdScaled is what the tree compares
+                ss << "{\"threshold\":" << st.threshold << ",\"thresholdScaled\":" << st.thresholdScaled
+                   << ",\"wentLeft\":" << (st.wentLeft ? "true" : "false")
+                   << ",\"positiveFraction\":" << st.positiveFraction << ",\"samples\":" << st.samples << "}";
+            }
+            ss << "],\"leafPositiveFraction\":" << e.leafPositiveFraction
+               << ",\"leafSamples\":" << e.leafSamples << "}}";
+            ss << ",\"naive_bayes\":{\"risk\":" << e.nbRisk << ",\"prediction\":" << pred(e.nbRisk)
+               << ",\"explain\":{\"safe\":{\"mean\":" << e.nbSafeMean << ",\"std\":" << e.nbSafeStd
+               << ",\"prior\":" << e.nbSafePrior << "},\"cancer\":{\"mean\":" << e.nbCancerMean
+               << ",\"std\":" << e.nbCancerStd << ",\"prior\":" << e.nbCancerPrior << "}}}";
+            ss << "},\"consensus\":{\"cancer\":" << cancer << ",\"safe\":" << (4 - cancer) << "}}";
             res.set_content(ss.str(), "application/json");
             return;
         }
@@ -295,13 +363,17 @@ int serverMain() {
         else if (modelStr == "naive_bayes") model = CancerDiagnosisSystem::ModelType::NAIVE_BAYES;
 
         double risk = system.diagnosePatient(patient, model);
-        int pred = system.predictPatient(patient, model);
+        if (model == CancerDiagnosisSystem::ModelType::KNN && k > 0) {
+            DiagnosisExplanation e;
+            system.explainPatient(patient, k, e);
+            risk = e.knnRisk;
+        }
+        int pred = risk >= 0.5 ? 1 : 0;
 
         std::ostringstream ss;
         ss << "{\"patient_id\":\"" << json_escape(patient.getPatientId()) << "\",\"riskScore\":" << risk << ",\"prediction\":" << pred << "}";
         res.set_content(ss.str(), "application/json");
     });
-
 
     // GET /evaluate -> metrics of all models on a held-out 20% test split
     svr.Get("/evaluate", [&](const httplib::Request& req, httplib::Response& res) {

@@ -30,6 +30,12 @@ public:
     std::vector<int> predict(const std::vector<std::vector<double>>& X) const;
     int predictSingle(const std::vector<double>& sample) const;
     std::vector<double> predictProbability(const std::vector<std::vector<double>>& X) const;
+    // Nearest training samples for one sample: (distance, training row index),
+    // closest first; ties are broken by row index. kOverride > 0 uses that K
+    // for this call only (the trained K is not changed).
+    std::vector<std::pair<double, size_t>> findNeighbors(const std::vector<double>& sample,
+                                                         int kOverride = 0) const;
+    int getTrainingLabel(size_t index) const;
     
     // Parameters
     void setK(int k);
