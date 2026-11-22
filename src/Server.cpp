@@ -414,6 +414,32 @@ int serverMain() {
         sendJson(res, 200, ss.str());
     });
 
+    // DELETE /patients/{id} -> removes the patient (undoable)
+    svr.Delete(R"(/patients/([^/]+))", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        string id = req.matches[1];
+        string error;
+        int status = system.deletePatient(id, error);
+        if (status != 200) {
+            sendError(res, status, error);
+            return;
+        }
+        sendJson(res, 200, "{\"deleted\":" + jsonString(id) + ",\"undoAvailable\":" +
+                               std::to_string(system.undoDepth()) + ",\"status\":" + statusJson(system) + "}");
+    });
+
+    // POST /undo -> reverts the last add or delete
+    svr.Post("/undo", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        string description;
+        if (!system.undo(description)) {
+            sendError(res, 400, "Nothing to undo");
+            return;
+        }
+        sendJson(res, 200, "{\"undone\":" + jsonString(description) + ",\"undoAvailable\":" +
+                               std::to_string(system.undoDepth()) + ",\"status\":" + statusJson(system) + "}");
+    });
+
     // GET /patients/index?id=P007 -> AVL lookup with the keys visited
     svr.Get("/patients/index", [&](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);
@@ -738,6 +764,64 @@ int serverMain() {
            << ",\"height\":" << tree.height() << ",\"depth\":" << depth
            << ",\"root\":" << kdNodeJson(tree, system.getModels().scaler, system.getTrainPatients(),
                                           tree.getRoot(), 0, static_cast<int>(depth)) << "}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /triage -> the heap array (index order) and the patients in priority order
+    svr.Get("/triage", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        auto item = [&](const TriageItem& t) {
+            const Patient* p = system.findPatient(t.id);
+            return "{\"patient_id\":" + jsonString(t.id) + ",\"name\":" + (p ? jsonString(p->getName()) : string("null")) +
+                   ",\"risk\":" + jsonNumber(t.risk) + ",\"arrival\":" + std::to_string(t.arrival) + "}";
+        };
+        auto heap = system.triageHeapArray();
+        auto sorted = system.triageSorted();
+        std::ostringstream ss;
+        ss << "{\"size\":" << heap.size() << ",\"heap\":[";
+        for (size_t i = 0; i < heap.size(); ++i) ss << (i ? "," : "") << item(heap[i]);
+        ss << "],\"sorted\":[";
+        for (size_t i = 0; i < sorted.size(); ++i) ss << (i ? "," : "") << item(sorted[i]);
+        ss << "]}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // POST /triage {"patient_id"} -> push into the priority queue by consensus risk
+    svr.Post("/triage", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        JsonValue body;
+        if (!readBody(req, res, body)) return;
+        string pid = stringField(body, "patient_id");
+        if (pid.empty()) {
+            sendError(res, 400, "Missing patient_id");
+            return;
+        }
+        string error;
+        int status = system.triagePush(pid, error);
+        if (status != 200) {
+            sendError(res, status, error);
+            return;
+        }
+        const Patient* p = system.findPatient(pid);
+        sendJson(res, 200, "{\"success\":true,\"patient_id\":" + jsonString(pid) + ",\"risk\":" +
+                               jsonNumber(p->getRiskScore()) + ",\"size\":" +
+                               std::to_string(system.triageHeapArray().size()) + "}");
+    });
+
+    // POST /triage/process -> pops every patient, highest risk first
+    svr.Post("/triage/process", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        auto results = system.triageProcess();
+        std::ostringstream ss;
+        ss << "{\"processed\":" << results.size() << ",\"results\":[";
+        for (size_t i = 0; i < results.size(); ++i) {
+            const auto& r = results[i];
+            if (i) ss << ",";
+            ss << "{\"rank\":" << (i + 1) << ",\"patient_id\":" << jsonString(r.patient->getPatientId())
+               << ",\"name\":" << jsonString(r.patient->getName()) << ",\"risk\":" << jsonNumber(r.risk)
+               << ",\"prediction\":" << r.prediction << "}";
+        }
+        ss << "]}";
         sendJson(res, 200, ss.str());
     });
 

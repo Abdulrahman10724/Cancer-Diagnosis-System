@@ -12,6 +12,8 @@
 #include "EvaluationMetrics.h"
 #include "LinkedQueue.h"
 #include "AVLTree.h"
+#include "BinaryHeap.h"
+#include "Stack.h"
 
 /**
  * @struct PatientNode
@@ -171,6 +173,28 @@ struct StringLess {
     bool operator()(const std::string& a, const std::string& b) const { return a < b; }
 };
 
+// Triage: highest risk first; equal risk -> earlier arrival first
+struct TriageItem {
+    double risk;
+    long arrival;
+    std::string id;
+};
+
+struct TriageHigher {
+    bool operator()(const TriageItem& a, const TriageItem& b) const {
+        if (a.risk != b.risk) return a.risk > b.risk;
+        return a.arrival < b.arrival;
+    }
+};
+
+// One undoable action
+struct UndoRecord {
+    enum Type { ADD, DELETE } type;
+    Patient patient;                     // the patient added or deleted
+    size_t position;                     // list position of a deleted patient
+    std::vector<std::string> newGenes;   // genes created by an add
+};
+
 struct QueueResult {
     const Patient* patient;
     double risk;
@@ -206,6 +230,20 @@ private:
     AVLTree<std::string, Patient*, StringLess> idIndex;   // Patient_ID -> patient
     AVLTree<RiskKey, Patient*, RiskKeyLess> riskIndex;    // (risk, Patient_ID) -> patient
     void rebuildIndexes();
+
+    // Triage priority queue (max-heap by consensus risk)
+    BinaryHeap<TriageItem, TriageHigher> triage;
+    long triageArrivals;
+    void rebuildTriage();
+
+    // Undo history (latest action on top), at most MAX_UNDO records
+    Stack<UndoRecord> undoStack;
+    static const size_t MAX_UNDO = 50;
+    void pushUndo(const UndoRecord& record);
+    // Linked-list editing helpers
+    bool unlinkPatient(const std::string& id, Patient& removed, size_t& position);
+    void insertPatientAt(const Patient& p, size_t position);
+    void afterChange(bool labelledChanged);
 
     void install(LoadedDataset& data, const DatasetFiles& f, const std::string& name);
     void appendPatient(const Patient& p);
@@ -244,6 +282,11 @@ public:
     bool searchPatientTrace(const std::string& id, std::vector<std::string>& visitedOrder) const;
     // status: 200 ok, 400 bad input, 409 duplicate; error set otherwise
     int addPatient(const NewPatientInput& input, std::vector<GeneReport>& report, std::string& error);
+    // status 200 or 404
+    int deletePatient(const std::string& id, std::string& error);
+    // Reverts the last add or delete; returns false when there is nothing to undo
+    bool undo(std::string& description);
+    size_t undoDepth() const;
 
     // Genes
     const HashMapper& getGenes() const;
@@ -265,6 +308,12 @@ public:
     size_t queueSize() const;
     std::vector<std::string> queuedIds() const;
     std::vector<QueueResult> processQueue(int model);
+
+    // Triage priority queue
+    int triagePush(const std::string& id, std::string& error); // 200, 400, 404 or 409
+    std::vector<TriageItem> triageHeapArray() const;          // heap order (index order)
+    std::vector<TriageItem> triageSorted() const;             // priority order
+    std::vector<QueueResult> triageProcess();                 // pops everything
 };
 
 #endif // CANCER_DIAGNOSIS_SYSTEM_H

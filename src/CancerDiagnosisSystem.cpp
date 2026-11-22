@@ -12,7 +12,7 @@ const double TEST_RATIO = 0.2;
 }
 
 CancerDiagnosisSystem::CancerDiagnosisSystem()
-    : head(nullptr), tail(nullptr), patientCount(0), hasDataset(false) {}
+    : head(nullptr), tail(nullptr), patientCount(0), hasDataset(false), triageArrivals(0) {}
 
 // ---------------------------------------------------------------- dataset
 
@@ -43,6 +43,8 @@ void CancerDiagnosisSystem::install(LoadedDataset& data, const DatasetFiles& f, 
     datasetName = name;
     hasDataset = true;
     testQueue.clear();
+    triage.clear();
+    undoStack.clear();
     retrain();
 }
 
@@ -103,6 +105,19 @@ void CancerDiagnosisSystem::refreshRisks() {
         n->patient.setRisk(mean, mean >= 0.5 ? 1 : 0);
     }
     rebuildIndexes();
+    rebuildTriage();
+}
+
+void CancerDiagnosisSystem::rebuildTriage() {
+    // Risks change after retraining: push every waiting patient again with its new risk
+    std::vector<TriageItem> items = triage.toArray();
+    triage.clear();
+    for (auto& item : items) {
+        const Patient* p = findPatient(item.id);
+        if (!p || !p->getHasRisk()) continue;
+        item.risk = p->getRiskScore();
+        triage.push(item);
+    }
 }
 
 void CancerDiagnosisSystem::rebuildIndexes() {
@@ -253,15 +268,126 @@ int CancerDiagnosisSystem::addPatient(const NewPatientInput& in, std::vector<Gen
         p.addGeneId(g.geneId);
     }
     appendPatient(p);
-    if (p.isLabelled()) retrain();
-    else refreshRisks();
+    UndoRecord record;
+    record.type = UndoRecord::ADD;
+    record.patient = p;
+    record.position = patientCount - 1;
+    for (const auto& r : report) {
+        if (!r.existed) record.newGenes.push_back(r.geneId);
+    }
+    pushUndo(record);
+    afterChange(p.isLabelled());
+    return 200;
+}
 
+void CancerDiagnosisSystem::afterChange(bool labelledChanged) {
+    // Labelled patients change the training data; others only need risks and indexes
+    if (labelledChanged) retrain();
+    else refreshRisks();
     std::string saveError;
     if (!saveDataset(saveError)) {
         std::cerr << "Warning: " << saveError << std::endl;
     }
+}
+
+void CancerDiagnosisSystem::pushUndo(const UndoRecord& record) {
+    undoStack.push(record);
+    while (undoStack.size() > MAX_UNDO) undoStack.dropBottom();
+}
+
+bool CancerDiagnosisSystem::unlinkPatient(const std::string& id, Patient& removed, size_t& position) {
+    PatientNode* prev = nullptr;
+    position = 0;
+    for (PatientNode* n = head.get(); n; n = n->next.get(), ++position) {
+        if (n->patient.getPatientId() != id) {
+            prev = n;
+            continue;
+        }
+        removed = n->patient;
+        if (tail == n) tail = prev; // before unlinking: n may be freed below
+        std::shared_ptr<PatientNode> rest = n->next;
+        if (prev) prev->next = rest;
+        else head = rest;
+        patientCount--;
+        return true;
+    }
+    return false;
+}
+
+void CancerDiagnosisSystem::insertPatientAt(const Patient& p, size_t position) {
+    if (position >= patientCount) {
+        appendPatient(p);
+        return;
+    }
+    auto node = std::make_shared<PatientNode>(p);
+    refreshFeatures(node->patient);
+    if (position == 0) {
+        node->next = head;
+        head = node;
+    } else {
+        PatientNode* prev = head.get();
+        for (size_t i = 1; i < position; ++i) prev = prev->next.get();
+        node->next = prev->next;
+        prev->next = node;
+    }
+    patientCount++;
+}
+
+int CancerDiagnosisSystem::deletePatient(const std::string& id, std::string& error) {
+    Patient removed;
+    size_t position = 0;
+    if (!unlinkPatient(id, removed, position)) {
+        error = "Patient ID '" + id + "' not found";
+        return 404;
+    }
+    testQueue.removeAll(id);
+    UndoRecord record;
+    record.type = UndoRecord::DELETE;
+    record.patient = removed;
+    record.position = position;
+    pushUndo(record);
+    afterChange(removed.isLabelled());
     return 200;
 }
+
+bool CancerDiagnosisSystem::undo(std::string& description) {
+    if (undoStack.empty()) return false;
+    UndoRecord record = undoStack.pop();
+    if (record.type == UndoRecord::ADD) {
+        Patient removed;
+        size_t position = 0;
+        unlinkPatient(record.patient.getPatientId(), removed, position);
+        testQueue.removeAll(record.patient.getPatientId());
+        // Remove genes that this add created, unless another patient now uses them
+        for (const auto& gid : record.newGenes) {
+            bool used = false;
+            for (PatientNode* n = head.get(); n && !used; n = n->next.get()) {
+                for (const auto& g : n->patient.getGeneIds()) {
+                    if (g == gid) {
+                        used = true;
+                        break;
+                    }
+                }
+            }
+            if (used) continue;
+            genes.erase(gid);
+            for (size_t i = 0; i < geneOrder.size(); ++i) {
+                if (geneOrder[i] == gid) {
+                    geneOrder.erase(geneOrder.begin() + static_cast<long>(i));
+                    break;
+                }
+            }
+        }
+        description = "add " + record.patient.getPatientId();
+    } else {
+        insertPatientAt(record.patient, record.position);
+        description = "delete " + record.patient.getPatientId();
+    }
+    afterChange(record.patient.isLabelled());
+    return true;
+}
+
+size_t CancerDiagnosisSystem::undoDepth() const { return undoStack.size(); }
 
 const HashMapper& CancerDiagnosisSystem::getGenes() const { return genes; }
 const std::vector<std::string>& CancerDiagnosisSystem::getGeneOrder() const { return geneOrder; }
@@ -634,6 +760,54 @@ bool CancerDiagnosisSystem::enqueue(const std::string& id) {
 size_t CancerDiagnosisSystem::queueSize() const { return testQueue.size(); }
 
 std::vector<std::string> CancerDiagnosisSystem::queuedIds() const { return testQueue.toVector(); }
+
+int CancerDiagnosisSystem::triagePush(const std::string& id, std::string& error) {
+    if (!models.trained) {
+        error = "Load data first";
+        return 400;
+    }
+    const Patient* p = findPatient(id);
+    if (!p) {
+        error = "Patient ID '" + id + "' not found";
+        return 404;
+    }
+    for (const auto& item : triage.toArray()) {
+        if (item.id == id) {
+            error = "Patient '" + id + "' is already in the triage queue";
+            return 409;
+        }
+    }
+    // Risks are computed for every patient after training; diagnose now if one is missing
+    double risk = p->getHasRisk() ? p->getRiskScore() : 0.0;
+    if (!p->getHasRisk()) {
+        Diagnosis d;
+        diagnose(*p, 0, d);
+        risk = d.meanRisk;
+    }
+    triage.push(TriageItem{risk, triageArrivals++, id});
+    return 200;
+}
+
+std::vector<TriageItem> CancerDiagnosisSystem::triageHeapArray() const { return triage.toArray(); }
+
+std::vector<TriageItem> CancerDiagnosisSystem::triageSorted() const {
+    BinaryHeap<TriageItem, TriageHigher> copy;
+    for (const auto& item : triage.toArray()) copy.push(item);
+    std::vector<TriageItem> out;
+    while (!copy.empty()) out.push_back(copy.pop());
+    return out;
+}
+
+std::vector<QueueResult> CancerDiagnosisSystem::triageProcess() {
+    std::vector<QueueResult> out;
+    while (!triage.empty()) {
+        TriageItem item = triage.pop();
+        const Patient* p = findPatient(item.id);
+        if (!p) continue;
+        out.push_back(QueueResult{p, item.risk, item.risk >= 0.5 ? 1 : 0});
+    }
+    return out;
+}
 
 std::vector<QueueResult> CancerDiagnosisSystem::processQueue(int model) {
     std::vector<QueueResult> results;
