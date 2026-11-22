@@ -23,9 +23,11 @@ export function confidence(risk) {
 }
 
 // Display level only (the prediction itself always uses the 50% line)
+// Uses the rounded percentage people see, so "35%" is never called low.
 export function riskLevel(risk) {
-  if (risk < 0.35) return 'low';
-  if (risk <= 0.65) return 'medium';
+  const shown = Math.round(risk * 100);
+  if (shown < 35) return 'low';
+  if (shown <= 65) return 'medium';
   return 'high';
 }
 

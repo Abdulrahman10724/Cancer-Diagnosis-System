@@ -1,0 +1,146 @@
+.pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: var(--s3);
+}
+
+.pick :global(.field) {
+  flex: 0 1 340px;
+  min-width: 240px;
+}
+
+.report {
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s4);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-raised);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding-bottom: var(--s2);
+  border-bottom: 2px solid var(--text);
+}
+
+.title {
+  font-size: var(--text-xl);
+}
+
+.date {
+  color: var(--muted);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s2);
+  margin: 0;
+}
+
+.details dt {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.details dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.final {
+  font-size: var(--text-md);
+}
+
+.table {
+  width: 100%;
+  font-size: var(--text-sm);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.table th {
+  font-weight: 700;
+  border-bottom-color: var(--border-strong);
+}
+
+.model {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.barCell {
+  display: grid;
+  grid-template-columns: 3rem minmax(80px, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 700px) {
+  .report {
+    padding: var(--s2);
+  }
+
+  .details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .barCell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
+  .noPrint {
+    display: none !important;
+  }
+
+  .report {
+    max-width: none;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .details,
+  .block,
+  .table tr {
+    break-inside: avoid;
+  }
+}

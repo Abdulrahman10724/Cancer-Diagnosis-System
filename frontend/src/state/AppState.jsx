@@ -29,8 +29,6 @@ const initialState = {
   // Latest "all models" result per patient ID (Home step 3, report)
   results: {},
   toasts: [],
-  // LEGACY: used by the old gel screen until it is replaced
-  gelSlots: [],
 };
 
 let toastId = 0;
@@ -63,11 +61,6 @@ function reducer(state, action) {
       return { ...state, toasts: [...state.toasts, { id: ++toastId, text: action.text, tone: action.tone }] };
     case 'toast-done':
       return { ...state, toasts: state.toasts.filter((t) => t.id !== action.id) };
-    case 'gel-load':
-      if (state.gelSlots.includes(action.id) || state.gelSlots.length >= 3) return state;
-      return { ...state, gelSlots: [...state.gelSlots, action.id] };
-    case 'gel-unload':
-      return { ...state, gelSlots: state.gelSlots.filter((id) => id !== action.id) };
     default:
       return state;
   }
@@ -124,7 +117,7 @@ export function AppStateProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      state: { ...state, notebook: state.activity },
+      state,
       refresh,
       log,
       toast,
@@ -132,9 +125,6 @@ export function AppStateProvider({ children }) {
       selectPatient,
       saveResult,
       clearResults,
-      // LEGACY: old gel screen
-      loadIntoGel: (id) => dispatch({ type: 'gel-load', id }),
-      unloadFromGel: (id) => dispatch({ type: 'gel-unload', id }),
     }),
     [state, refresh, log, toast, dismissToast, selectPatient, saveResult, clearResults],
   );
