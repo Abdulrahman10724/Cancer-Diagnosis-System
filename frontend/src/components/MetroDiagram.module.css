@@ -1,0 +1,171 @@
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--font);
+}
+
+.line {
+  transition: opacity 0.2s;
+  outline: none;
+}
+
+.interactive .line {
+  cursor: pointer;
+}
+
+.hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 28;
+}
+
+.track {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.connector {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2;
+  opacity: 0.7;
+}
+
+.stopDot {
+  fill: var(--night);
+  stroke: var(--c);
+  stroke-width: 3;
+}
+
+.core {
+  fill: none;
+  stroke: var(--rail);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.dashMask {
+  fill: none;
+  stroke: var(--night);
+  stroke-width: 10;
+  stroke-dasharray: 6 8;
+}
+
+.lineName {
+  fill: var(--on-night);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* The only glow: the hovered or selected line on the night map */
+.glow .track,
+.glowPath {
+  filter: drop-shadow(0 0 6px var(--c));
+}
+
+.line:focus-visible .track,
+.line:focus-visible .core {
+  stroke-width: 11;
+}
+
+.line:focus-visible .lineName {
+  text-decoration: underline;
+}
+
+/* Stations */
+.station {
+  outline: none;
+}
+
+.interactive .station {
+  cursor: pointer;
+}
+
+.hitStation {
+  fill: transparent;
+}
+
+.stop {
+  fill: var(--night);
+  stroke: var(--on-night);
+  stroke-width: 4;
+}
+
+.done .stop {
+  fill: var(--on-night);
+}
+
+.glyphDone {
+  stroke: var(--night);
+}
+
+.locked .stop {
+  stroke: var(--rail);
+  fill: var(--night);
+}
+
+.glyphLock {
+  color: var(--rail);
+}
+
+.locked .stationName {
+  fill: var(--on-night-muted);
+}
+
+.interactive .locked {
+  cursor: not-allowed;
+}
+
+.stationName {
+  fill: var(--on-night);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.stationNumber {
+  fill: var(--on-night-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.station:focus-visible .stop {
+  stroke: #fff;
+  stroke-width: 5;
+}
+
+.station:focus-visible .stationName {
+  text-decoration: underline;
+}
+
+.interactive .station:not(.locked):hover .stationName {
+  text-decoration: underline;
+}
+
+/* Current station: slow opacity pulse, 2.4s */
+.pulse {
+  fill: none;
+  stroke: var(--on-night);
+  stroke-width: 2;
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.7; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse { animation: none; opacity: 0.5; }
+}
+
+.train :global(.train-body) {
+  fill: var(--on-night);
+}
+
+.train :global(.train-window) {
+  fill: var(--night);
+}
