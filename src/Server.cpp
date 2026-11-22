@@ -1,5 +1,6 @@
 #include "../headers/CancerDiagnosisSystem.h"
 #include "../headers/Json.h"
+#include "../headers/DatasetStore.h"
 #include <cerrno>
 #include <cstdlib>
 #include <iostream>
@@ -9,6 +10,8 @@
 #include <vector>
 
 // Single-header HTTP library (third_party/httplib.h)
+// Bodies sent without a JSON content type (curl -d) are treated as forms; allow the same 5 MB
+#define CPPHTTPLIB_FORM_URL_ENCODED_PAYLOAD_MAX_LENGTH (5 * 1024 * 1024)
 #include "../third_party/httplib.h"
 
 using std::string;
@@ -308,6 +311,88 @@ int serverMain() {
                          f.patientGenes == DEFAULT_FILES.patientGenes;
         std::vector<string> problems;
         if (!system.loadDataset(f, isDefault ? "default" : "custom", problems)) {
+            sendProblems(res, problems);
+            return;
+        }
+        sendJson(res, 200, statusJson(system));
+    });
+
+    // POST /upload {"name","patientsCsv","genesCsv","patientGenesCsv"} -> validate, save, load
+    svr.Post("/upload", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        JsonValue body;
+        if (!readBody(req, res, body)) return;
+        string name = stringField(body, "name");
+        if (!DatasetStore::validName(name)) {
+            sendError(res, 400, "name must be 1 to 40 characters from a-z, 0-9 and - (and not 'default')");
+            return;
+        }
+        if (DatasetStore::exists(name)) {
+            sendError(res, 409, "A dataset called '" + name + "' already exists");
+            return;
+        }
+        const JsonValue* p = body.get("patientsCsv");
+        const JsonValue* g = body.get("genesCsv");
+        const JsonValue* pg = body.get("patientGenesCsv");
+        if (!p || !p->isString() || !g || !g->isString() || !pg || !pg->isString()) {
+            sendError(res, 400, "patientsCsv, genesCsv and patientGenesCsv must be the CSV files as text");
+            return;
+        }
+        DatasetContent content{p->text, g->text, pg->text};
+        // Validate before anything is written; the active dataset stays if this fails
+        LoadedDataset check;
+        std::vector<string> problems;
+        if (!DatasetLoader::parse(content, check, problems)) {
+            sendProblems(res, problems);
+            return;
+        }
+        string error;
+        if (!DatasetStore::writeUpload(name, content, error)) {
+            sendError(res, 500, error);
+            return;
+        }
+        if (!system.loadContent(content, DatasetStore::filesFor(name), name, problems)) {
+            sendProblems(res, problems);
+            return;
+        }
+        sendJson(res, 200, statusJson(system));
+    });
+
+    // GET /datasets -> "default" and every folder in data/uploads, with counts
+    svr.Get("/datasets", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        std::vector<string> names;
+        names.push_back("default");
+        for (const auto& n : DatasetStore::uploadNames()) names.push_back(n);
+        std::ostringstream ss;
+        ss << "{\"active\":" << (system.hasData() ? jsonString(system.getDatasetName()) : "null") << ",\"datasets\":[";
+        for (size_t i = 0; i < names.size(); ++i) {
+            DatasetInfo info = DatasetStore::describe(names[i]);
+            if (i) ss << ",";
+            ss << "{\"name\":" << jsonString(info.name) << ",\"valid\":" << (info.valid ? "true" : "false")
+               << ",\"patientCount\":" << info.patients << ",\"labelledCount\":" << info.labelled
+               << ",\"geneCount\":" << info.genes << "}";
+        }
+        ss << "]}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // POST /datasets/select {"name":"my-data"} -> loads that dataset
+    svr.Post("/datasets/select", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        JsonValue body;
+        if (!readBody(req, res, body)) return;
+        string name = stringField(body, "name");
+        if (name.empty()) {
+            sendError(res, 400, "Missing name");
+            return;
+        }
+        if (!DatasetStore::exists(name)) {
+            sendError(res, 404, "Dataset '" + name + "' not found");
+            return;
+        }
+        std::vector<string> problems;
+        if (!system.loadDataset(DatasetStore::filesFor(name), name, problems)) {
             sendProblems(res, problems);
             return;
         }

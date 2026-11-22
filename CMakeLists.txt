@@ -16,6 +16,7 @@ add_library(cds_core STATIC
     src/CancerDiagnosisSystem.cpp
     src/DataPreprocessor.cpp
     src/DatasetLoader.cpp
+    src/DatasetStore.cpp
     src/DecisionTreeClassifier.cpp
     src/EvaluationMetrics.cpp
     src/FeatureExtractor.cpp
@@ -31,6 +32,10 @@ add_library(cds_core STATIC
     src/Sorting.cpp
 )
 target_include_directories(cds_core PUBLIC headers)
+# std::filesystem needs an extra library on GCC 8 (older MinGW)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.1)
+    target_link_libraries(cds_core PUBLIC stdc++fs)
+endif()
 
 # HTTP server
 add_executable(cds_server src/Server.cpp)
