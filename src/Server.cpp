@@ -1,52 +1,220 @@
 #include "../headers/CancerDiagnosisSystem.h"
+#include "../headers/Json.h"
+#include <cerrno>
+#include <cstdlib>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <fstream>
-#include <mutex>
-#include <iomanip>
 
-// NOTE: This server uses the single-header cpp-httplib library.
-// Download it from: https://github.com/yhirose/cpp-httplib (place httplib.h in a folder named third_party)
+// Single-header HTTP library (third_party/httplib.h)
 #include "../third_party/httplib.h"
 
-using namespace std;
+using std::string;
 
-// Forward declare serverMain (defined below after all handlers)
-int serverMain();
+namespace {
 
-// Helper: escape JSON string
-static string json_escape(const string &s) {
-    string out;
-    for (char c : s) {
-        switch (c) {
-            case '"': out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\b': out += "\\b"; break;
-            case '\f': out += "\\f"; break;
-            case '\n': out += "\\n"; break;
-            case '\r': out += "\\r"; break;
-            case '\t': out += "\\t"; break;
-            default:
-                out.push_back(c);
-        }
+const DatasetFiles DEFAULT_FILES = {"data/patients.csv", "data/genes.csv", "data/patient_genes.csv"};
+
+// ------------------------------------------------------------ responses
+
+void sendJson(httplib::Response& res, int status, const string& body) {
+    res.status = status;
+    res.set_content(body, "application/json");
+}
+
+void sendError(httplib::Response& res, int status, const string& message) {
+    sendJson(res, status, "{\"error\":" + jsonString(message) + "}");
+}
+
+void sendProblems(httplib::Response& res, const std::vector<string>& problems) {
+    std::ostringstream ss;
+    ss << "{\"error\":\"Dataset is invalid\",\"problems\":[";
+    for (size_t i = 0; i < problems.size(); ++i) {
+        if (i) ss << ",";
+        ss << jsonString(problems[i]);
     }
-    return out;
+    ss << "]}";
+    sendJson(res, 400, ss.str());
 }
 
-// Helper: read a number (quoted or unquoted) after "key": in a naive JSON body
-static double extractNumber(const string &body, const string &key, double defaultValue = 0.0) {
-    size_t p = body.find("\"" + key + "\"");
-    if (p == string::npos) return defaultValue;
-    size_t colon = body.find(':', p);
-    if (colon == string::npos) return defaultValue;
-    size_t numStart = body.find_first_not_of(" \t\r\n\"", colon + 1);
-    if (numStart == string::npos) return defaultValue;
-    size_t numEnd = body.find_first_of(",}]\" \t\r\n", numStart);
-    string numStr = body.substr(numStart, (numEnd == string::npos ? body.size() - numStart : numEnd - numStart));
-    try { return stod(numStr); } catch(...) { return defaultValue; }
+// Parse the request body as a JSON object; an empty body counts as {}
+bool readBody(const httplib::Request& req, httplib::Response& res, JsonValue& body) {
+    string trimmed = req.body;
+    if (trimmed.find_first_not_of(" \t\r\n") == string::npos) {
+        body = JsonValue();
+        body.type = JsonValue::Object;
+        return true;
+    }
+    string error;
+    if (!JsonValue::parse(req.body, body, error)) {
+        sendError(res, 400, error);
+        return false;
+    }
+    if (!body.isObject()) {
+        sendError(res, 400, "The request body must be a JSON object");
+        return false;
+    }
+    return true;
 }
+
+string stringField(const JsonValue& body, const string& key, const string& fallback = "") {
+    const JsonValue* v = body.get(key);
+    return (v && v->isString()) ? v->text : fallback;
+}
+
+bool parseIntParam(const string& s, long& out) {
+    if (s.empty()) return false;
+    char* end = nullptr;
+    errno = 0;
+    long v = std::strtol(s.c_str(), &end, 10);
+    if (end != s.c_str() + s.size() || errno == ERANGE) return false;
+    out = v;
+    return true;
+}
+
+// Reads ?k= (odd 1-15). Returns false (and sends 400) when present but invalid.
+bool readK(const httplib::Request& req, httplib::Response& res, int& k) {
+    k = 0;
+    if (!req.has_param("k")) return true;
+    long v = 0;
+    if (!parseIntParam(req.get_param_value("k"), v) || v < 1 || v > 15 || v % 2 == 0) {
+        sendError(res, 400, "k must be an odd number from 1 to 15");
+        return false;
+    }
+    k = static_cast<int>(v);
+    return true;
+}
+
+// ------------------------------------------------------------ JSON pieces
+
+string featuresJson(const std::vector<double>& f) {
+    const auto& names = FeatureExtractor::featureNames();
+    std::ostringstream ss;
+    ss << "{";
+    for (size_t j = 0; j < names.size(); ++j) {
+        if (j) ss << ",";
+        ss << jsonString(names[j]) << ":" << (j < f.size() ? jsonNumber(f[j]) : "null");
+    }
+    ss << "}";
+    return ss.str();
+}
+
+string featureNamesJson() {
+    const auto& names = FeatureExtractor::featureNames();
+    std::ostringstream ss;
+    ss << "[";
+    for (size_t j = 0; j < names.size(); ++j) {
+        if (j) ss << ",";
+        ss << jsonString(names[j]);
+    }
+    ss << "]";
+    return ss.str();
+}
+
+string diagnosisJson(int d) {
+    return d == 0 || d == 1 ? std::to_string(d) : "null";
+}
+
+string patientJson(const Patient& p) {
+    std::ostringstream ss;
+    ss << "{\"patient_id\":" << jsonString(p.getPatientId())
+       << ",\"name\":" << jsonString(p.getName())
+       << ",\"age\":" << p.getAge()
+       << ",\"diagnosis\":" << diagnosisJson(p.getDiagnosis())
+       << ",\"features\":" << featuresJson(p.getFeatures())
+       << ",\"riskScore\":" << (p.getHasRisk() ? jsonNumber(p.getRiskScore()) : "null")
+       << ",\"prediction\":" << (p.getHasRisk() ? std::to_string(p.getPrediction()) : "null")
+       << ",\"geneIds\":[";
+    const auto& ids = p.getGeneIds();
+    for (size_t i = 0; i < ids.size(); ++i) {
+        if (i) ss << ",";
+        ss << jsonString(ids[i]);
+    }
+    ss << "]}";
+    return ss.str();
+}
+
+string statusJson(const CancerDiagnosisSystem& system) {
+    std::ostringstream ss;
+    ss << "{\"modelsTrained\":" << (system.areModelsTrained() ? "true" : "false")
+       << ",\"dataset\":" << (system.hasData() ? jsonString(system.getDatasetName()) : "null")
+       << ",\"patientCount\":" << system.getPatientCount()
+       << ",\"labelledCount\":" << system.getLabelledCount()
+       << ",\"geneCount\":" << system.getGenes().size()
+       << ",\"featureNames\":" << featureNamesJson() << "}";
+    return ss.str();
+}
+
+string diagnoseAllJson(const Patient& p, const Diagnosis& d) {
+    const auto& names = FeatureExtractor::featureNames();
+    const int F = FeatureExtractor::NUM_FEATURES;
+    auto pred = [](double r) { return r >= 0.5 ? 1 : 0; };
+    std::ostringstream ss;
+    ss << "{\"patient_id\":" << jsonString(p.getPatientId())
+       << ",\"features\":" << featuresJson(d.raw)
+       << ",\"featuresScaled\":" << featuresJson(d.scaled)
+       << ",\"threshold\":0.5,\"models\":{";
+
+    // Logistic regression
+    ss << "\"logistic\":{\"risk\":" << jsonNumber(d.risk[ModelSet::LOGISTIC])
+       << ",\"prediction\":" << pred(d.risk[ModelSet::LOGISTIC])
+       << ",\"explain\":{\"bias\":" << jsonNumber(d.lrBias) << ",\"contributions\":[";
+    for (size_t i = 0; i < d.lrContributions.size(); ++i) {
+        const auto& c = d.lrContributions[i];
+        if (i) ss << ",";
+        ss << "{\"feature\":" << jsonString(names[c.feature]) << ",\"weight\":" << jsonNumber(c.weight)
+           << ",\"value\":" << jsonNumber(c.value) << ",\"product\":" << jsonNumber(c.product) << "}";
+    }
+    ss << "],\"z\":" << jsonNumber(d.lrZ) << "}}";
+
+    // KNN
+    ss << ",\"knn\":{\"risk\":" << jsonNumber(d.risk[ModelSet::KNN])
+       << ",\"prediction\":" << pred(d.risk[ModelSet::KNN]) << ",\"k\":" << d.k
+       << ",\"explain\":{\"neighbors\":[";
+    for (size_t i = 0; i < d.neighbors.size(); ++i) {
+        const auto& n = d.neighbors[i];
+        if (i) ss << ",";
+        ss << "{\"patient_id\":" << jsonString(n.patient->getPatientId())
+           << ",\"features\":" << featuresJson(n.patient->getFeatures())
+           << ",\"diagnosis\":" << diagnosisJson(n.patient->getDiagnosis())
+           << ",\"distance\":" << jsonNumber(n.distance) << "}";
+    }
+    ss << "],\"votesCancer\":" << d.votesCancer << ",\"votesSafe\":" << d.votesSafe
+       << ",\"kdNodesVisited\":" << d.kdNodesVisited << "}}";
+
+    // Decision tree
+    ss << ",\"decision_tree\":{\"risk\":" << jsonNumber(d.risk[ModelSet::DECISION_TREE])
+       << ",\"prediction\":" << pred(d.risk[ModelSet::DECISION_TREE]) << ",\"explain\":{\"path\":[";
+    for (size_t i = 0; i < d.path.size(); ++i) {
+        const auto& s = d.path[i];
+        if (i) ss << ",";
+        ss << "{\"feature\":" << jsonString(names[s.feature]) << ",\"threshold\":" << jsonNumber(s.threshold)
+           << ",\"thresholdRaw\":" << jsonNumber(s.thresholdRaw) << ",\"value\":" << jsonNumber(s.value)
+           << ",\"wentLeft\":" << (s.wentLeft ? "true" : "false") << "}";
+    }
+    ss << "],\"leafSamples\":" << d.leafSamples
+       << ",\"leafPositiveFraction\":" << jsonNumber(d.leafPositiveFraction) << "}}";
+
+    // Naive Bayes (statistics in raw units)
+    ss << ",\"naive_bayes\":{\"risk\":" << jsonNumber(d.risk[ModelSet::NAIVE_BAYES])
+       << ",\"prediction\":" << pred(d.risk[ModelSet::NAIVE_BAYES])
+       << ",\"explain\":{\"prior\":[" << jsonNumber(d.nbPrior[0]) << "," << jsonNumber(d.nbPrior[1])
+       << "],\"perFeature\":[";
+    for (int j = 0; j < F; ++j) {
+        if (j) ss << ",";
+        ss << "{\"feature\":" << jsonString(names[j])
+           << ",\"mean\":[" << jsonNumber(d.nbMeanRaw[0][j]) << "," << jsonNumber(d.nbMeanRaw[1][j]) << "]"
+           << ",\"std\":[" << jsonNumber(d.nbStdRaw[0][j]) << "," << jsonNumber(d.nbStdRaw[1][j]) << "]"
+           << ",\"value\":" << jsonNumber(d.raw[j]) << "}";
+    }
+    ss << "]}}},\"consensus\":{\"cancer\":" << d.cancerVotes << ",\"safe\":" << (ModelSet::NUM_MODELS - d.cancerVotes)
+       << ",\"meanRisk\":" << jsonNumber(d.meanRisk) << "}}";
+    return ss.str();
+}
+
+} // namespace
 
 int serverMain() {
     httplib::Server svr;
@@ -54,410 +222,317 @@ int serverMain() {
     // All handlers share one system object; cpp-httplib runs handlers on a thread pool
     std::mutex systemMutex;
 
-    // Add CORS header to ALL responses (including errors)
-    svr.set_post_routing_handler([](const httplib::Request& req, httplib::Response& res) {
+    svr.set_payload_max_length(5 * 1024 * 1024);
+
+    // CORS header on every response, including errors
+    svr.set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
         if (!res.has_header("Access-Control-Allow-Origin")) {
             res.set_header("Access-Control-Allow-Origin", "*");
         }
     });
 
     // CORS preflight for every route
-    svr.Options(R"(.*)", [&](const httplib::Request& req, httplib::Response& res) {
+    svr.Options(R"(.*)", [](const httplib::Request&, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.set_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         res.set_content("", "text/plain");
     });
 
-    svr.Get("/status", [&](const httplib::Request& req, httplib::Response& res) {
+    // Load the default dataset at start-up
+    {
+        std::vector<string> problems;
+        if (system.loadDataset(DEFAULT_FILES, "default", problems)) {
+            std::cout << "Loaded the default dataset: " << system.getPatientCount() << " patients, "
+                      << system.getGenes().size() << " genes." << std::endl;
+        } else {
+            std::cout << "The default dataset was not loaded:" << std::endl;
+            for (const auto& p : problems) std::cout << "  " << p << std::endl;
+        }
+    }
+
+    svr.Get("/status", [&](const httplib::Request&, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);
-        std::ostringstream ss;
-        ss << "{\"modelsTrained\":" << (system.areModelsTrained() ? "true" : "false")
-           << ",\"geneticCount\":" << system.getGeneticDataCount()
-           << ",\"patientCount\":" << system.getPatientCount() << "}";
-        res.set_content(ss.str(), "application/json");
+        sendJson(res, 200, statusJson(system));
     });
 
-
-    // POST /load {"genesFile":"data/genes.csv","patientsFile":"data/patients.csv"}
+    // POST /load {"patientsFile","genesFile","patientGenesFile"} (missing fields use data/ defaults)
     svr.Post("/load", [&](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);
-        string body = req.body;
-        // naive JSON parsing (just extract values)
-        auto extract = [&](const string &key)->string {
-            size_t p = body.find(key);
-            if (p == string::npos) return string();
-            size_t colon = body.find(':', p);
-            if (colon == string::npos) return string();
-            size_t start = body.find_first_of('\"', colon);
-            if (start == string::npos) return string();
-            start++;
-            size_t end = body.find('"', start);
-            if (end == string::npos) return string();
-            return body.substr(start, end - start);
-        };
-
-        string genesFile = extract("genesFile");
-        string patientsFile = extract("patientsFile");
-        string patientGenesFile = extract("patientGenesFile");
-        if (patientGenesFile.empty()) patientGenesFile = "data/patient_genes.csv";
-
-        if (genesFile.empty() || patientsFile.empty()) {
-            res.status = 400;
-            res.set_content("{\"error\":\"Missing genesFile or patientsFile\"}", "application/json");
+        JsonValue body;
+        if (!readBody(req, res, body)) return;
+        DatasetFiles f;
+        f.patients = stringField(body, "patientsFile", DEFAULT_FILES.patients);
+        f.genes = stringField(body, "genesFile", DEFAULT_FILES.genes);
+        f.patientGenes = stringField(body, "patientGenesFile", DEFAULT_FILES.patientGenes);
+        bool isDefault = f.patients == DEFAULT_FILES.patients && f.genes == DEFAULT_FILES.genes &&
+                         f.patientGenes == DEFAULT_FILES.patientGenes;
+        std::vector<string> problems;
+        if (!system.loadDataset(f, isDefault ? "default" : "custom", problems)) {
+            sendProblems(res, problems);
             return;
         }
-
-        // Load data and train models
-        system.loadData(genesFile, patientsFile, patientGenesFile);
-
-        std::ostringstream ss;
-        ss << "{\"modelsTrained\":" << (system.areModelsTrained() ? "true" : "false")
-           << ",\"geneticCount\":" << system.getGeneticDataCount()
-           << ",\"patientCount\":" << system.getPatientCount() << "}";
-        res.set_content(ss.str(), "application/json");
+        sendJson(res, 200, statusJson(system));
     });
 
+    svr.Get("/patients", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        std::ostringstream ss;
+        ss << "[";
+        bool first = true;
+        for (const Patient* p : system.patientsInOrder()) {
+            if (!first) ss << ",";
+            first = false;
+            ss << patientJson(*p);
+        }
+        ss << "]";
+        sendJson(res, 200, ss.str());
+    });
 
-    // POST /patients  { "patient_id":"P011","name":"Alice","age":30, "geneticRecords":[{"geneId":"GENE_010","mutationScore":0.45,"label":0}, ...] }
+    // POST /patients {"patient_id","name","age","diagnosis":0/1/null,"genes":[{"geneId","mutationScore"}]}
     svr.Post("/patients", [&](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);
-        string body = req.body;
-        auto extract = [&](const string &key)->string {
-            size_t p = body.find(key);
-            if (p == string::npos) return string();
-            size_t colon = body.find(':', p);
-            if (colon == string::npos) return string();
-            size_t start = body.find_first_of('"', colon);
-            if (start == string::npos) return string();
-            start++;
-            size_t end = body.find('"', start);
-            if (end == string::npos) return string();
-            return body.substr(start, end - start);
-        };
-
-        // Support a few key name variants
-        string pid = extract("patient_id");
-        if (pid.empty()) pid = extract("patientId");
-        if (pid.empty()) pid = extract("id");
-        string name = extract("name");
-        int age = static_cast<int>(extractNumber(body, "age", 0.0));
-
-        if (pid.empty() || name.empty()) {
-            res.status = 400;
-            res.set_content("{\"error\":\"Missing patient_id or name\"}", "application/json");
+        JsonValue body;
+        if (!readBody(req, res, body)) return;
+        NewPatientInput in;
+        in.id = stringField(body, "patient_id");
+        in.name = stringField(body, "name");
+        const JsonValue* age = body.get("age");
+        if (!age || !age->isNumber() || age->number != static_cast<double>(static_cast<long>(age->number))) {
+            sendError(res, 400, "age must be a whole number from 0 to 120");
             return;
         }
-
-        // Reject duplicate patient IDs
-        Patient existing;
-        if (system.getPatientById(pid, existing)) {
-            res.status = 409;
-            res.set_content("{\"error\":\"Patient ID already exists\"}", "application/json");
-            return;
-        }
-
-        // Create patient and attach any genetic records found in body
-        Patient patient(pid, name, age);
-
-        // Naive scan for gene entries: look for occurrences of "geneId" or "gene_id"
-        size_t pos = 0;
-        int genesAdded = 0;
-        while (true) {
-            size_t gpos = body.find("geneId", pos);
-            if (gpos == string::npos) gpos = body.find("gene_id", pos);
-            if (gpos == string::npos) break;
-
-            // extract gene id
-            size_t colon = body.find(':', gpos);
-            size_t start = body.find_first_of('"', colon);
-            if (start == string::npos) break; start++;
-            size_t end = body.find('"', start);
-            if (end == string::npos) break;
-            string geneId = body.substr(start, end - start);
-
-            // mutationScore (try several variants)
-            double mutationScore = 0.0;
-            size_t mpos = body.find("mutationScore", end);
-            if (mpos == string::npos) mpos = body.find("mutation_score", end);
-            if (mpos != string::npos) {
-                size_t mcolon = body.find(':', mpos);
-                if (mcolon != string::npos) {
-                    // read number after colon
-                    size_t numStart = body.find_first_not_of(" \t\r\n\"", mcolon+1);
-                    if (numStart != string::npos) {
-                        size_t numEnd = body.find_first_of(",}]\n\r", numStart);
-                        string numStr = body.substr(numStart, (numEnd==string::npos? body.size()-numStart: numEnd-numStart));
-                        try { mutationScore = stod(numStr); } catch(...) { mutationScore = 0.0; }
-                    }
-                }
-            }
-
-            int label = 0;
-            size_t lpos = body.find("label", end);
-            if (lpos != string::npos) {
-                size_t lcolon = body.find(':', lpos);
-                if (lcolon != string::npos) {
-                    size_t numStart = body.find_first_not_of(" \t\r\n\"", lcolon+1);
-                    if (numStart != string::npos) {
-                        size_t numEnd = body.find_first_of(",}]\n\r", numStart);
-                        string numStr = body.substr(numStart, (numEnd==string::npos? body.size()-numStart: numEnd-numStart));
-                        try { label = stoi(numStr); } catch(...) { label = 0; }
-                    }
-                }
-            }
-
-            // Create GeneticData and attach to global system and patient
-            GeneticData gd(geneId, mutationScore, label);
-            system.addGeneticData(gd);
-            patient.addGeneticData(gd);
-            genesAdded++;
-
-            pos = end + 1;
-        }
-
-        // Retrain models so they include the new genetic data
-        if (genesAdded > 0) {
-            system.retrainModels();
-        }
-
-        // Add patient to system history (makes patient immediately available for /diagnose)
-        system.addPatient(patient);
-        
-        // IMPORTANT: Auto-save to CSV files immediately after adding patient
-        system.saveDataToFiles("data/genes.csv", "data/patients.csv", "data/patient_genes.csv");
-
-        std::ostringstream ss;
-        ss << "{\"success\":true,\"patientCount\":" << system.getPatientCount()
-           << ",\"geneticCount\":" << system.getGeneticDataCount() << ",\"message\":\"Patient added and data auto-saved to CSV\"}";
-        res.set_content(ss.str(), "application/json");
-    });
-
-    svr.Get("/patients", [&](const httplib::Request& req, httplib::Response& res) {
-        std::lock_guard<std::mutex> lock(systemMutex);
-        std::ostringstream ss;
-        ss << "[";
-        bool first = true;
-        for (const auto& p : system.getAllPatients()) {
-            if (!first) ss << ",";
-            ss << "{\"patient_id\":\"" << json_escape(p.getPatientId())
-               << "\",\"name\":\"" << json_escape(p.getName())
-               << "\",\"age\":" << p.getAge()
-               << ",\"riskScore\":" << p.getRiskScore()
-               << ",\"prediction\":" << p.getPrediction()
-               << ",\"genes\":[";
-            bool firstGene = true;
-            for (const auto& g : p.getGeneticData()) {
-                if (!firstGene) ss << ",";
-                firstGene = false;
-                ss << "{\"gene_id\":\"" << json_escape(g.getGeneId())
-                   << "\",\"mutation_score\":" << g.getMutationScore()
-                   << ",\"label\":" << g.getLabel() << "}";
-            }
-            ss << "]}";
-            first = false;
-        }
-        ss << "]";
-        res.set_content(ss.str(), "application/json");
-    });
-
-    svr.Get(R"(/genetic)", [&](const httplib::Request& req, httplib::Response& res) {
-        std::lock_guard<std::mutex> lock(systemMutex);
-        std::ostringstream ss;
-        ss << "[";
-        bool first = true;
-        for (const auto& g : system.getAllGeneticData()) {
-            if (!first) ss << ",";
-            ss << "{\"gene_id\":\"" << json_escape(g.getGeneId())
-               << "\",\"mutation_score\":" << g.getMutationScore()
-               << ",\"label\":" << g.getLabel() << "}";
-            first = false;
-        }
-        ss << "]";
-        res.set_content(ss.str(), "application/json");
-    });
-
-    // GET /diagnose?patient_id=P001&model=logistic
-    // GET /diagnose?patient_id=P001&model=logistic|knn|decision_tree|naive_bayes|all&k=5
-    // model=all returns all four models with the numbers behind each prediction.
-    // k (optional, odd 1-15) sets the KNN K for this request only.
-    svr.Get(R"(/diagnose)", [&](const httplib::Request& req, httplib::Response& res) {
-        std::lock_guard<std::mutex> lock(systemMutex);
-        string pid;
-        string modelStr = "logistic";
-        if (req.has_param("patient_id")) pid = req.get_param_value("patient_id");
-        if (req.has_param("model")) modelStr = req.get_param_value("model");
-
-        if (pid.empty()) {
-            res.status = 400;
-            res.set_content("{\"error\":\"Missing patient_id\"}", "application/json");
-            return;
-        }
-
-        int k = 0; // 0 = use the trained default
-        if (req.has_param("k")) {
-            try { k = stoi(req.get_param_value("k")); } catch(...) { k = -1; }
-            if (k < 1 || k > 15 || k % 2 == 0) {
-                res.status = 400;
-                res.set_content("{\"error\":\"k must be an odd number from 1 to 15\"}", "application/json");
+        in.age = static_cast<int>(age->number);
+        in.diagnosis = Patient::UNKNOWN;
+        const JsonValue* diag = body.get("diagnosis");
+        if (diag && !diag->isNull()) {
+            if (!diag->isNumber() || (diag->number != 0.0 && diag->number != 1.0)) {
+                sendError(res, 400, "diagnosis must be 0, 1 or null");
                 return;
             }
+            in.diagnosis = static_cast<int>(diag->number);
         }
-
-        if (!system.areModelsTrained()) {
-            res.status = 400;
-            res.set_content("{\"error\":\"Load data first\"}", "application/json");
+        const JsonValue* list = body.get("genes");
+        if (!list || !list->isArray()) {
+            sendError(res, 400, "genes must be a list like [{\"geneId\":\"GENE_001\",\"mutationScore\":0.5}]");
             return;
         }
-
-        Patient patient;
-        if (!system.getPatientById(pid, patient)) {
-            res.status = 404;
-            std::ostringstream ss; ss << "{\"error\":\"Patient ID '" << json_escape(pid) << "' not found\"}";
-            res.set_content(ss.str(), "application/json");
-            return;
-        }
-
-        if (modelStr == "all") {
-            DiagnosisExplanation e;
-            system.explainPatient(patient, k, e);
-            const double threshold = 0.5;
-            auto pred = [&](double r) { return r >= threshold ? 1 : 0; };
-            int cancer = pred(e.lrRisk) + pred(e.knnRisk) + pred(e.dtRisk) + pred(e.nbRisk);
-
-            std::ostringstream ss;
-            ss << std::setprecision(6);
-            ss << "{\"patient_id\":\"" << json_escape(patient.getPatientId()) << "\""
-               << ",\"featureRaw\":" << e.featureRaw
-               << ",\"featureScaled\":" << e.featureScaled
-               << ",\"scale\":{\"mean\":" << e.scaleMean << ",\"std\":" << e.scaleStd << "}"
-               << ",\"geneCount\":" << e.geneCount
-               << ",\"threshold\":" << threshold
-               << ",\"models\":{";
-            ss << "\"logistic\":{\"risk\":" << e.lrRisk << ",\"prediction\":" << pred(e.lrRisk)
-               << ",\"explain\":{\"weight\":" << e.lrWeight << ",\"bias\":" << e.lrBias
-               << ",\"z\":" << e.lrZ << "}}";
-            ss << ",\"knn\":{\"risk\":" << e.knnRisk << ",\"prediction\":" << pred(e.knnRisk)
-               << ",\"k\":" << e.k << ",\"explain\":{\"neighbors\":[";
-            for (size_t i = 0; i < e.neighbors.size(); ++i) {
-                const auto& n = e.neighbors[i];
-                if (i) ss << ",";
-                // mutation_score is RAW (from genes.csv); distance is in the scaled space
-                ss << "{\"gene_id\":\"" << json_escape(n.geneId) << "\",\"mutation_score\":" << n.mutationScore
-                   << ",\"label\":" << n.label << ",\"distance\":" << n.distance << "}";
+        for (const auto& item : list->items) {
+            const JsonValue* gid = item.get("geneId");
+            if (!item.isObject() || !gid || !gid->isString()) {
+                sendError(res, 400, "Every gene needs a geneId");
+                return;
             }
-            ss << "],\"votesCancer\":" << e.votesCancer << ",\"votesSafe\":" << e.votesSafe << "}}";
-            ss << ",\"decision_tree\":{\"risk\":" << e.dtRisk << ",\"prediction\":" << pred(e.dtRisk)
-               << ",\"explain\":{\"path\":[";
-            for (size_t i = 0; i < e.path.size(); ++i) {
-                const auto& st = e.path[i];
-                if (i) ss << ",";
-                // threshold is on the raw score scale; thresholdScaled is what the tree compares
-                ss << "{\"threshold\":" << st.threshold << ",\"thresholdScaled\":" << st.thresholdScaled
-                   << ",\"wentLeft\":" << (st.wentLeft ? "true" : "false")
-                   << ",\"positiveFraction\":" << st.positiveFraction << ",\"samples\":" << st.samples << "}";
+            NewGene g;
+            g.geneId = gid->text;
+            const JsonValue* sc = item.get("mutationScore");
+            g.hasScore = sc && sc->isNumber();
+            g.score = g.hasScore ? sc->number : 0.0;
+            if (sc && !sc->isNull() && !sc->isNumber()) {
+                sendError(res, 400, "mutationScore must be a number from 0 to 1");
+                return;
             }
-            ss << "],\"leafPositiveFraction\":" << e.leafPositiveFraction
-               << ",\"leafSamples\":" << e.leafSamples << "}}";
-            ss << ",\"naive_bayes\":{\"risk\":" << e.nbRisk << ",\"prediction\":" << pred(e.nbRisk)
-               << ",\"explain\":{\"safe\":{\"mean\":" << e.nbSafeMean << ",\"std\":" << e.nbSafeStd
-               << ",\"prior\":" << e.nbSafePrior << "},\"cancer\":{\"mean\":" << e.nbCancerMean
-               << ",\"std\":" << e.nbCancerStd << ",\"prior\":" << e.nbCancerPrior << "}}}";
-            ss << "},\"consensus\":{\"cancer\":" << cancer << ",\"safe\":" << (4 - cancer) << "}}";
-            res.set_content(ss.str(), "application/json");
+            in.genes.push_back(g);
+        }
+        std::vector<GeneReport> report;
+        string error;
+        int status = system.addPatient(in, report, error);
+        if (status != 200) {
+            sendError(res, status, error);
             return;
         }
-
-        CancerDiagnosisSystem::ModelType model = CancerDiagnosisSystem::ModelType::LOGISTIC;
-        if (modelStr == "knn") model = CancerDiagnosisSystem::ModelType::KNN;
-        else if (modelStr == "decision_tree") model = CancerDiagnosisSystem::ModelType::DECISION_TREE;
-        else if (modelStr == "naive_bayes") model = CancerDiagnosisSystem::ModelType::NAIVE_BAYES;
-
-        double risk = system.diagnosePatient(patient, model);
-        if (model == CancerDiagnosisSystem::ModelType::KNN && k > 0) {
-            DiagnosisExplanation e;
-            system.explainPatient(patient, k, e);
-            risk = e.knnRisk;
-        }
-        int pred = risk >= 0.5 ? 1 : 0;
-
+        const Patient* p = system.findPatient(in.id);
         std::ostringstream ss;
-        ss << "{\"patient_id\":\"" << json_escape(patient.getPatientId()) << "\",\"riskScore\":" << risk << ",\"prediction\":" << pred << "}";
-        res.set_content(ss.str(), "application/json");
+        ss << "{\"success\":true,\"patient\":" << patientJson(*p) << ",\"genes\":[";
+        for (size_t i = 0; i < report.size(); ++i) {
+            const auto& r = report[i];
+            if (i) ss << ",";
+            ss << "{\"geneId\":" << jsonString(r.geneId) << ",\"mutationScore\":" << jsonNumber(r.usedScore)
+               << ",\"existing\":" << (r.existed ? "true" : "false")
+               << ",\"sentScoreIgnored\":" << (r.scoreIgnored ? "true" : "false") << "}";
+        }
+        ss << "],\"status\":" << statusJson(system) << "}";
+        sendJson(res, 200, ss.str());
     });
 
-    // GET /evaluate -> metrics of all models on a held-out 20% test split
-    svr.Get("/evaluate", [&](const httplib::Request& req, httplib::Response& res) {
+    // GET /patients/search?id=P007 -> linear search of the linked list with the visit order
+    svr.Get("/patients/search", [&](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);
-        std::vector<ModelEvaluation> results;
-        size_t testSamples = 0;
-        if (!system.evaluateModelsHoldout(results, testSamples)) {
-            res.status = 400;
-            res.set_content("{\"error\":\"Load data first\"}", "application/json");
+        string id = req.has_param("id") ? req.get_param_value("id") : string();
+        if (id.empty()) {
+            sendError(res, 400, "Missing id");
             return;
         }
-
+        std::vector<string> order;
+        bool found = system.searchPatientTrace(id, order);
         std::ostringstream ss;
-        ss << std::fixed << std::setprecision(4);
-        ss << "{\"testSamples\":" << testSamples << ",\"models\":[";
-        for (size_t i = 0; i < results.size(); ++i) {
+        ss << "{\"found\":" << (found ? "true" : "false") << ",\"hops\":" << order.size() << ",\"order\":[";
+        for (size_t i = 0; i < order.size(); ++i) {
             if (i) ss << ",";
-            ss << "{\"key\":\"" << json_escape(results[i].key)
-               << "\",\"name\":\"" << json_escape(results[i].name)
-               << "\",\"accuracy\":" << results[i].accuracy
-               << ",\"precision\":" << results[i].precision
-               << ",\"recall\":" << results[i].recall
-               << ",\"f1\":" << results[i].f1
-               << ",\"confusion\":{\"tp\":" << results[i].confusion.truePositive
-               << ",\"fp\":" << results[i].confusion.falsePositive
-               << ",\"tn\":" << results[i].confusion.trueNegative
-               << ",\"fn\":" << results[i].confusion.falseNegative << "}"
+            ss << jsonString(order[i]);
+        }
+        ss << "]}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /genetic -> every gene and its mutation score (insertion order)
+    svr.Get("/genetic", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        std::ostringstream ss;
+        ss << "[";
+        bool first = true;
+        for (const auto& id : system.getGeneOrder()) {
+            double s = 0.0;
+            if (!system.getGenes().get(id, s)) continue;
+            if (!first) ss << ",";
+            first = false;
+            ss << "{\"gene_id\":" << jsonString(id) << ",\"mutation_score\":" << jsonNumber(s) << "}";
+        }
+        ss << "]";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /diagnose?patient_id=P007&model=all|logistic|knn|decision_tree|naive_bayes&k=5
+    svr.Get("/diagnose", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        string pid = req.has_param("patient_id") ? req.get_param_value("patient_id") : string();
+        string modelKey = req.has_param("model") ? req.get_param_value("model") : string("logistic");
+        int k = 0;
+        if (pid.empty()) {
+            sendError(res, 400, "Missing patient_id");
+            return;
+        }
+        if (!readK(req, res, k)) return;
+        int model = ModelSet::fromKey(modelKey);
+        if (modelKey != "all" && model < 0) {
+            sendError(res, 400, "model must be all, logistic, knn, decision_tree or naive_bayes");
+            return;
+        }
+        if (!system.areModelsTrained()) {
+            sendError(res, 400, "Load data first");
+            return;
+        }
+        const Patient* p = system.findPatient(pid);
+        if (!p) {
+            sendError(res, 404, "Patient ID '" + pid + "' not found");
+            return;
+        }
+        if (modelKey == "all") {
+            Diagnosis d;
+            system.diagnose(*p, k, d);
+            sendJson(res, 200, diagnoseAllJson(*p, d));
+            return;
+        }
+        double r = system.modelRisk(*p, model, k);
+        std::ostringstream ss;
+        ss << "{\"patient_id\":" << jsonString(p->getPatientId()) << ",\"riskScore\":" << jsonNumber(r)
+           << ",\"prediction\":" << (r >= 0.5 ? 1 : 0) << "}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /evaluate -> metrics on a stratified 80/20 split (seed 42)
+    svr.Get("/evaluate", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        EvaluationResult ev;
+        if (!system.evaluate(ev)) {
+            sendError(res, 400, "Load data first");
+            return;
+        }
+        std::ostringstream ss;
+        ss << "{\"split\":{\"train\":" << ev.trainCount << ",\"test\":" << ev.testCount
+           << ",\"seed\":" << ev.seed << "},\"testSamples\":" << ev.testCount << ",\"models\":[";
+        for (size_t i = 0; i < ev.models.size(); ++i) {
+            const auto& m = ev.models[i];
+            if (i) ss << ",";
+            ss << "{\"key\":" << jsonString(ModelSet::key(m.model)) << ",\"name\":" << jsonString(ModelSet::name(m.model))
+               << ",\"accuracy\":" << jsonNumber(m.accuracy) << ",\"precision\":" << jsonNumber(m.precision)
+               << ",\"recall\":" << jsonNumber(m.recall) << ",\"f1\":" << jsonNumber(m.f1)
+               << ",\"confusion\":{\"tp\":" << m.confusion.truePositive << ",\"fp\":" << m.confusion.falsePositive
+               << ",\"tn\":" << m.confusion.trueNegative << ",\"fn\":" << m.confusion.falseNegative << "}"
                << ",\"samples\":[";
-            for (size_t j = 0; j < results[i].samples.size(); ++j) {
-                const auto& sm = results[i].samples[j];
+            for (size_t j = 0; j < m.samples.size(); ++j) {
+                const auto& s = m.samples[j];
                 if (j) ss << ",";
-                ss << "{\"gene_id\":\"" << json_escape(sm.geneId) << "\""
-                   << ",\"mutation_score\":" << sm.mutationScore
-                   << ",\"label\":" << sm.label
-                   << ",\"risk\":" << sm.risk << "}";
+                ss << "{\"patient_id\":" << jsonString(s.patient->getPatientId())
+                   << ",\"features\":" << featuresJson(s.patient->getFeatures())
+                   << ",\"diagnosis\":" << s.label << ",\"risk\":" << jsonNumber(s.risk) << "}";
             }
             ss << "]}";
         }
         ss << "]}";
-        res.set_content(ss.str(), "application/json");
+        sendJson(res, 200, ss.str());
     });
 
-    // GET /patients/search?id=P007 -> linear search of the linked list, with the visit order
-    svr.Get("/patients/search", [&](const httplib::Request& req, httplib::Response& res) {
+    // GET /queue -> {"queueSize":N,"patients":["P1","P2"]} (front first)
+    svr.Get("/queue", [&](const httplib::Request&, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);
-        string pid = req.has_param("id") ? req.get_param_value("id") : string();
-        if (pid.empty()) {
-            res.status = 400;
-            res.set_content("{\"error\":\"Missing id\"}", "application/json");
-            return;
-        }
-        std::vector<std::string> order;
-        bool found = system.searchPatientTrace(pid, order);
+        auto ids = system.queuedIds();
         std::ostringstream ss;
-        ss << "{\"found\":" << (found ? "true" : "false")
-           << ",\"hops\":" << order.size() << ",\"order\":[";
-        for (size_t i = 0; i < order.size(); ++i) {
+        ss << "{\"queueSize\":" << ids.size() << ",\"patients\":[";
+        for (size_t i = 0; i < ids.size(); ++i) {
             if (i) ss << ",";
-            ss << "\"" << json_escape(order[i]) << "\"";
+            ss << jsonString(ids[i]);
         }
         ss << "]}";
-        res.set_content(ss.str(), "application/json");
+        sendJson(res, 200, ss.str());
     });
 
-    // GET /hashmap -> buckets of the mutation hash table (separate chaining)
-    svr.Get("/hashmap", [&](const httplib::Request& req, httplib::Response& res) {
+    // POST /queue {"patient_id":"P001"} -> add to the rear
+    svr.Post("/queue", [&](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);
-        const HashMapper& map = system.getMutationMapper();
+        JsonValue body;
+        if (!readBody(req, res, body)) return;
+        string pid = stringField(body, "patient_id");
+        if (pid.empty()) {
+            sendError(res, 400, "Missing patient_id");
+            return;
+        }
+        if (!system.enqueue(pid)) {
+            sendError(res, 404, "Patient ID '" + pid + "' not found");
+            return;
+        }
         std::ostringstream ss;
-        ss << std::setprecision(6);
-        ss << "{\"bucketCount\":" << map.bucketCount()
-           << ",\"size\":" << map.size()
-           << ",\"loadFactor\":" << map.loadFactor()
-           << ",\"buckets\":[";
+        ss << "{\"success\":true,\"queueSize\":" << system.queueSize()
+           << ",\"message\":\"Patient scheduled for diagnosis\"}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // POST /queue/process {"model":"logistic"} -> processes the whole queue, front first
+    svr.Post("/queue/process", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        JsonValue body;
+        if (!readBody(req, res, body)) return;
+        string modelKey = stringField(body, "model", "logistic");
+        int model = ModelSet::fromKey(modelKey);
+        if (model < 0) {
+            sendError(res, 400, "model must be logistic, knn, decision_tree or naive_bayes");
+            return;
+        }
+        if (!system.areModelsTrained()) {
+            sendError(res, 400, "Load data first");
+            return;
+        }
+        auto results = system.processQueue(model);
+        std::ostringstream ss;
+        ss << "{\"model\":" << jsonString(modelKey) << ",\"processed\":" << results.size() << ",\"results\":[";
+        for (size_t i = 0; i < results.size(); ++i) {
+            const auto& r = results[i];
+            if (i) ss << ",";
+            ss << "{\"patient_id\":" << jsonString(r.patient->getPatientId())
+               << ",\"name\":" << jsonString(r.patient->getName())
+               << ",\"riskScore\":" << jsonNumber(r.risk) << ",\"prediction\":" << r.prediction
+               << ",\"status\":\"processed\"}";
+        }
+        ss << "],\"patientCount\":" << system.getPatientCount() << "}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /hashmap -> buckets of the gene hash table (separate chaining)
+    svr.Get("/hashmap", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        const HashMapper& map = system.getGenes();
+        std::ostringstream ss;
+        ss << "{\"bucketCount\":" << map.bucketCount() << ",\"size\":" << map.size()
+           << ",\"loadFactor\":" << jsonNumber(map.loadFactor()) << ",\"buckets\":[";
         for (size_t i = 0; i < map.bucketCount(); ++i) {
             if (i) ss << ",";
             ss << "{\"index\":" << i << ",\"items\":[";
@@ -465,129 +540,20 @@ int serverMain() {
             for (const HashNode* node = map.bucketHead(i); node; node = node->next.get()) {
                 if (!first) ss << ",";
                 first = false;
-                ss << "{\"key\":\"" << json_escape(node->key) << "\",\"value\":" << node->value
+                ss << "{\"key\":" << jsonString(node->key) << ",\"value\":" << jsonNumber(node->value)
                    << ",\"hash\":" << HashMapper::hashKey(node->key) << "}";
             }
             ss << "]}";
         }
         ss << "]}";
-        res.set_content(ss.str(), "application/json");
+        sendJson(res, 200, ss.str());
     });
-
-    // GET /queue -> { queueSize: N, patients: ["P1","P2"] }
-    svr.Get("/queue", [&](const httplib::Request& req, httplib::Response& res) {
-        std::lock_guard<std::mutex> lock(systemMutex);
-        std::ostringstream ss;
-        auto ids = system.getQueuedPatientIds();
-        ss << "{";
-        ss << "\"queueSize\":" << system.getQueueSize() << ",";
-        ss << "\"patients\":[";
-        for (size_t i = 0; i < ids.size(); ++i) {
-            if (i) ss << ",";
-            ss << "\"" << json_escape(ids[i]) << "\"";
-        }
-        ss << "]}";
-        res.set_content(ss.str(), "application/json");
-    });
-
-
-    // POST /queue { "patient_id":"P001" } -> schedule patient for testing
-    svr.Post("/queue", [&](const httplib::Request& req, httplib::Response& res) {
-        std::lock_guard<std::mutex> lock(systemMutex);
-        string body = req.body;
-        auto extract = [&](const string &key)->string {
-            size_t p = body.find(key);
-            if (p == string::npos) return string();
-            size_t colon = body.find(':', p);
-            if (colon == string::npos) return string();
-            size_t start = body.find_first_of('"', colon);
-            if (start == string::npos) return string();
-            start++;
-            size_t end = body.find('"', start);
-            if (end == string::npos) return string();
-            return body.substr(start, end - start);
-        };
-
-        string pid = extract("patient_id");
-        if (pid.empty()) pid = extract("patientId");
-        if (pid.empty()) {
-            res.status = 400;
-            res.set_content("{\"error\":\"Missing patient_id\"}", "application/json");
-            return;
-        }
-
-        Patient patient;
-        if (!system.getPatientById(pid, patient)) {
-            res.status = 404;
-            std::ostringstream ss; ss << "{\"error\":\"Patient ID '" << json_escape(pid) << "' not found\"}";
-            res.set_content(ss.str(), "application/json");
-            return;
-        }
-
-        system.scheduleTest(patient);
-
-        std::ostringstream ss;
-        ss << "{\"success\":true,\"queueSize\":" << system.getQueueSize() << ",\"message\":\"Patient scheduled for diagnosis\"}";
-        res.set_content(ss.str(), "application/json");
-    });
-
-    // POST /queue/process -> processes all queued patients with optional model selection
-    // Body: { "model": "logistic" } or empty for default (logistic)
-    svr.Post("/queue/process", [&](const httplib::Request& req, httplib::Response& res) {
-        std::lock_guard<std::mutex> lock(systemMutex);
-        string body = req.body;
-        
-        // Extract model from request body
-        string modelStr = "logistic"; // default
-        size_t modelPos = body.find("\"model\"");
-        if (modelPos != string::npos) {
-            size_t colon = body.find(':', modelPos);
-            if (colon != string::npos) {
-                size_t start = body.find_first_of('"', colon);
-                if (start != string::npos) {
-                    start++;
-                    size_t end = body.find('"', start);
-                    if (end != string::npos) {
-                        modelStr = body.substr(start, end - start);
-                    }
-                }
-            }
-        }
-        
-        // Map string to ModelType
-        CancerDiagnosisSystem::ModelType model = CancerDiagnosisSystem::ModelType::LOGISTIC;
-        if (modelStr == "knn") model = CancerDiagnosisSystem::ModelType::KNN;
-        else if (modelStr == "decision_tree") model = CancerDiagnosisSystem::ModelType::DECISION_TREE;
-        else if (modelStr == "naive_bayes") model = CancerDiagnosisSystem::ModelType::NAIVE_BAYES;
-
-        // Process queue with selected model and get diagnosis results
-        auto results = system.processTestQueueWithModel(model);
-
-        // Persist changes to CSV files
-        system.saveDataToFiles("data/genes.csv", "data/patients.csv", "data/patient_genes.csv");
-
-        // Build JSON array of results
-        std::ostringstream ss;
-        ss << "{\"model\":\"" << json_escape(modelStr) << "\",\"processed\":" << results.size() 
-           << ",\"results\":[";
-        for (size_t i = 0; i < results.size(); ++i) {
-            if (i) ss << ",";
-            ss << results[i];
-        }
-        ss << "],\"patientCount\":" << system.getPatientCount()
-           << ",\"geneticCount\":" << system.getGeneticDataCount() << "}";
-        res.set_content(ss.str(), "application/json");
-    });
-
 
     std::cout << "Starting server on http://localhost:8080 ..." << std::endl;
-        std::cout.flush();
-    
-        if (!svr.listen("localhost", 8080)) {
-            std::cerr << "Failed to bind to port 8080. Is another server already running?" << std::endl;
-            return 1;
-        }
-
+    if (!svr.listen("localhost", 8080)) {
+        std::cerr << "Failed to bind to port 8080. Is another server already running?" << std::endl;
+        return 1;
+    }
     return 0;
 }
 

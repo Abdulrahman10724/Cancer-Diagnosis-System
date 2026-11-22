@@ -46,7 +46,7 @@ private:
     int getMajorityClass(const std::vector<int>& y) const;
     
 public:
-    DecisionTreeClassifier(int maxDepth = 10, int minSamplesSplit = 2);
+    DecisionTreeClassifier(int maxDepth = 5, int minSamplesSplit = 4);
     
     // Training and prediction
     void fit(const std::vector<std::vector<double>>& X, const std::vector<int>& y);

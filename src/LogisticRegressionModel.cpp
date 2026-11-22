@@ -4,7 +4,7 @@
 #include <iostream>
 
 LogisticRegressionModel::LogisticRegressionModel(double learningRate, int maxIterations) 
-    : learningRate(learningRate), maxIterations(maxIterations), bias(0.0), isTrained(false) {}
+    : bias(0.0), learningRate(learningRate), maxIterations(maxIterations), isTrained(false) {}
 
 double LogisticRegressionModel::sigmoid(double z) const {
     // Clamp z to prevent overflow
@@ -81,13 +81,7 @@ void LogisticRegressionModel::gradientDescent(const std::vector<std::vector<doub
             weights[j] -= learningRate * weightGradients[j] / n;
         }
         bias -= learningRate * biasGradient / n;
-        
-        // Optional: Print progress every 100 iterations
-        if ((iter + 1) % 100 == 0) {
-            double loss = computeLoss(X, y);
-            // Uncomment for debugging
-            // std::cout << "Iteration " << (iter + 1) << ", Loss: " << loss << std::endl;
-        }
+
     }
 }
 

@@ -2,10 +2,14 @@
 #include <cmath>
 #include <stdexcept>
 
-NaiveBayesClassifier::NaiveBayesClassifier() : nFeatures(0), isTrained(false) {
+NaiveBayesClassifier::NaiveBayesClassifier() : isTrained(false) {
     for (int c = 0; c < 2; ++c) {
         prior[c] = 0.0;
         hasClass[c] = false;
+        for (int j = 0; j < F; ++j) {
+            mean[c][j] = 0.0;
+            stdDev[c][j] = 1.0;
+        }
     }
 }
 
@@ -17,44 +21,45 @@ void NaiveBayesClassifier::fit(const std::vector<std::vector<double>>& X,
     if (X.size() != y.size()) {
         throw std::runtime_error("X and y must have the same size");
     }
-    nFeatures = X[0].size();
+    if (X[0].size() != static_cast<size_t>(F)) {
+        throw std::runtime_error("Naive Bayes expects " + std::to_string(F) + " features");
+    }
+
     size_t count[2] = {0, 0};
+    double variance[2][F];
     for (int c = 0; c < 2; ++c) {
-        mean[c].assign(nFeatures, 0.0);
-        stdDev[c].assign(nFeatures, 1.0);
+        for (int j = 0; j < F; ++j) {
+            mean[c][j] = 0.0;
+            stdDev[c][j] = 1.0;
+            variance[c][j] = 0.0;
+        }
     }
 
     // Class counts and means
     for (size_t i = 0; i < X.size(); ++i) {
         int c = y[i] == 1 ? 1 : 0;
         count[c]++;
-        for (size_t j = 0; j < nFeatures; ++j) {
-            mean[c][j] += X[i][j];
-        }
+        for (int j = 0; j < F; ++j) mean[c][j] += X[i][j];
     }
     for (int c = 0; c < 2; ++c) {
         hasClass[c] = count[c] > 0;
         prior[c] = static_cast<double>(count[c]) / X.size();
         if (count[c] > 0) {
-            for (size_t j = 0; j < nFeatures; ++j) mean[c][j] /= count[c];
+            for (int j = 0; j < F; ++j) mean[c][j] /= count[c];
         }
     }
 
     // Sample standard deviation per class and feature
-    double variance[2][64] = {};
-    if (nFeatures > 64) {
-        throw std::runtime_error("Too many features for Naive Bayes");
-    }
     for (size_t i = 0; i < X.size(); ++i) {
         int c = y[i] == 1 ? 1 : 0;
-        for (size_t j = 0; j < nFeatures; ++j) {
+        for (int j = 0; j < F; ++j) {
             double d = X[i][j] - mean[c][j];
             variance[c][j] += d * d;
         }
     }
     for (int c = 0; c < 2; ++c) {
         if (count[c] <= 1) continue;
-        for (size_t j = 0; j < nFeatures; ++j) {
+        for (int j = 0; j < F; ++j) {
             double s = std::sqrt(variance[c][j] / (count[c] - 1));
             // A constant feature would give a zero spread; use a small floor instead
             stdDev[c][j] = s < 1e-6 ? 1e-6 : s;
@@ -71,7 +76,7 @@ double NaiveBayesClassifier::logGaussian(double x, double m, double s) const {
 
 double NaiveBayesClassifier::logPosterior(const std::vector<double>& features, int cls) const {
     double lp = std::log(prior[cls] + 1e-10);
-    for (size_t j = 0; j < nFeatures && j < features.size(); ++j) {
+    for (int j = 0; j < F && j < static_cast<int>(features.size()); ++j) {
         lp += logGaussian(features[j], mean[cls][j], stdDev[cls][j]);
     }
     return lp;
@@ -118,10 +123,12 @@ double NaiveBayesClassifier::getPrior(int cls) const {
     return (cls == 0 || cls == 1) ? prior[cls] : 0.0;
 }
 
-const std::vector<double>& NaiveBayesClassifier::getMeans(int cls) const {
-    return mean[cls == 1 ? 1 : 0];
+double NaiveBayesClassifier::getMean(int cls, int feature) const {
+    if ((cls != 0 && cls != 1) || feature < 0 || feature >= F) return 0.0;
+    return mean[cls][feature];
 }
 
-const std::vector<double>& NaiveBayesClassifier::getStds(int cls) const {
-    return stdDev[cls == 1 ? 1 : 0];
+double NaiveBayesClassifier::getStd(int cls, int feature) const {
+    if ((cls != 0 && cls != 1) || feature < 0 || feature >= F) return 1.0;
+    return stdDev[cls][feature];
 }

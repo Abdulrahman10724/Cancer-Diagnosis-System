@@ -1,215 +1,202 @@
 #ifndef CANCER_DIAGNOSIS_SYSTEM_H
 #define CANCER_DIAGNOSIS_SYSTEM_H
 
-#include "Patient.h"
-#include "GeneticData.h"
-#include "DataPreprocessor.h"
-#include "HashMapper.h"
-#include "DecisionTreeClassifier.h"
-#include "LogisticRegressionModel.h"
-#include "KNNClassifier.h"
-#include "NaiveBayesClassifier.h"
-#include "EvaluationMetrics.h"
-#include <vector>
-#include <queue>
-#include <list>
-#include <string>
 #include <memory>
+#include <string>
+#include <vector>
+#include "Patient.h"
+#include "HashMapper.h"
+#include "FeatureExtractor.h"
+#include "DatasetLoader.h"
+#include "ModelSet.h"
+#include "EvaluationMetrics.h"
+#include "LinkedQueue.h"
 
 /**
  * @struct PatientNode
- * @brief Node for linked list storing patient history
+ * @brief Node of the patient-history linked list (the master list, insertion order)
  */
-struct PatientNode
-{
+struct PatientNode {
     Patient patient;
     std::shared_ptr<PatientNode> next;
-    
-    PatientNode(const Patient& p) : patient(p), next(nullptr) {}
+
+    explicit PatientNode(const Patient& p) : patient(p), next(nullptr) {}
 };
 
-/**
- * @struct ModelEvaluation
- * @brief Evaluation metrics of one model on held-out test data
- */
+// ---- Diagnosis of one patient by all four models, with explanation data ----
+struct LogisticContribution {
+    int feature;
+    double weight;
+    double value;   // scaled value
+    double product; // weight * value
+};
+
+struct NeighborInfo {
+    const Patient* patient;
+    double distance; // in the standardized feature space
+};
+
+struct TreeStepInfo {
+    int feature;
+    double threshold;    // scaled
+    double thresholdRaw; // raw units
+    double value;        // patient's raw value
+    bool wentLeft;       // value <= threshold
+};
+
+struct Diagnosis {
+    std::vector<double> raw;
+    std::vector<double> scaled;
+    double risk[ModelSet::NUM_MODELS];
+
+    double lrBias;
+    double lrZ;
+    std::vector<LogisticContribution> lrContributions;
+
+    int k;
+    std::vector<NeighborInfo> neighbors;
+    int votesCancer;
+    int votesSafe;
+    long kdNodesVisited;
+
+    std::vector<TreeStepInfo> path;
+    int leafSamples;
+    double leafPositiveFraction;
+
+    double nbPrior[2];
+    double nbMeanRaw[2][FeatureExtractor::NUM_FEATURES];
+    double nbStdRaw[2][FeatureExtractor::NUM_FEATURES];
+
+    int cancerVotes;
+    double meanRisk;
+};
+
+// ---- Evaluation on a held-out split ----
 struct EvalSample {
-    std::string geneId;
-    double mutationScore; // raw score
-    int label;            // true label
-    double risk;          // predicted probability of label 1
+    const Patient* patient;
+    int label;
+    double risk;
 };
 
 struct ModelEvaluation {
-    std::string key;
-    std::string name;
+    int model;
     double accuracy;
     double precision;
     double recall;
     double f1;
-    ConfusionMatrix confusion;      // at threshold 0.5
-    std::vector<EvalSample> samples; // one entry per held-out test gene
+    ConfusionMatrix confusion;
+    std::vector<EvalSample> samples;
 };
 
-/**
- * @struct KnnNeighbor
- * @brief One training gene among the K nearest neighbours of a patient
- */
-struct KnnNeighbor {
+struct EvaluationResult {
+    size_t trainCount;
+    size_t testCount;
+    unsigned seed;
+    std::vector<ModelEvaluation> models;
+};
+
+// ---- Adding a patient ----
+struct NewGene {
     std::string geneId;
-    double mutationScore; // RAW score from genes.csv (not scaled)
-    int label;
-    double distance;      // distance in the SCALED feature space the model uses
+    double score;
+    bool hasScore;
 };
 
-/**
- * @struct TreeStep
- * @brief One decision on the path from the tree root to the leaf
- */
-struct TreeStep {
-    double threshold;       // split threshold converted back to the raw score scale
-    double thresholdScaled; // split threshold in the scaled space the tree uses
-    bool wentLeft;          // true when feature <= threshold
-    double positiveFraction;
-    int samples;
+struct NewPatientInput {
+    std::string id;
+    std::string name;
+    int age;
+    int diagnosis; // -1 unknown
+    std::vector<NewGene> genes;
 };
 
-/**
- * @struct DiagnosisExplanation
- * @brief Risk from all four models for one patient, with the numbers behind each
- */
-struct DiagnosisExplanation {
-    double featureRaw;    // mean mutation score of the patient's genes (before scaling)
-    double featureScaled; // after standardization
-    double scaleMean;
-    double scaleStd;
-    int geneCount;
+struct GeneReport {
+    std::string geneId;
+    double usedScore;
+    bool existed;       // true: stored score reused
+    bool scoreIgnored;  // true: a different score was sent and ignored
+    double sentScore;
+};
 
-    double lrRisk, lrWeight, lrBias, lrZ;
-
-    double knnRisk;
-    int k;
-    std::vector<KnnNeighbor> neighbors;
-    int votesCancer, votesSafe;
-
-    double dtRisk;
-    std::vector<TreeStep> path;
-    double leafPositiveFraction;
-    int leafSamples;
-
-    double nbRisk;
-    double nbSafeMean, nbSafeStd, nbSafePrior;
-    double nbCancerMean, nbCancerStd, nbCancerPrior;
+struct QueueResult {
+    const Patient* patient;
+    double risk;
+    int prediction;
 };
 
 /**
  * @class CancerDiagnosisSystem
- * @brief Main controller class for the cancer diagnosis system
+ * @brief Owns the active dataset, the trained models and the data structures
  */
-class CancerDiagnosisSystem
-{
+class CancerDiagnosisSystem {
 private:
-    // Data structures
-    std::vector<GeneticData> geneticDataArray;
-    std::shared_ptr<PatientNode> patientHistoryHead; // Linked list
-    std::queue<Patient> testRequestQueue;            // Queue for test scheduling
-    HashMapper mutationMapper;
+    // Dataset
+    std::shared_ptr<PatientNode> head;
+    PatientNode* tail;
+    size_t patientCount;
+    HashMapper genes;                    // Gene_ID -> mutation score
+    std::vector<std::string> geneOrder;  // genes in insertion order (for saving)
+    std::string datasetName;
+    DatasetFiles files;
+    bool hasDataset;
 
-    // Preprocessing
-    DataPreprocessor preprocessor;
+    // Models
+    ModelSet models;
+    std::vector<const Patient*> trainPatients;  // row i of the training matrix
+    std::vector<std::vector<double>> Xraw;
+    std::vector<int> y;
 
-    // ML Models
-    std::unique_ptr<LogisticRegressionModel> logisticModel;
-    std::unique_ptr<KNNClassifier> knnModel;
-    std::unique_ptr<DecisionTreeClassifier> decisionTreeModel;
-    std::unique_ptr<NaiveBayesClassifier> naiveBayesModel;
+    // Test queue (FIFO of patient IDs)
+    LinkedQueue<std::string> testQueue;
 
-    // Evaluation
-    EvaluationMetrics evaluator;
-
-    // Training data
-    std::vector<std::vector<double>> X_train;
-    std::vector<int> y_train;
-    bool modelsTrained;
-
-    // Helper functions
-    void loadGeneticDataFromFile(const std::string& filename);
-    void loadPatientsFromFile(const std::string& filename, const std::string& patientGenesFile);
-    void addPatientToHistory(const Patient& patient);
-    void updateOrAddPatientInHistory(const Patient& patient);
-    void prepareTrainingData();
-    void trainAllModels();
-    std::vector<double> extractFeatures(const Patient &patient) const;
-    double rawFeature(const Patient &patient) const;
+    void install(LoadedDataset& data, const DatasetFiles& f, const std::string& name);
+    void appendPatient(const Patient& p);
+    void refreshFeatures(Patient& p) const;
+    void refreshRisks();
+    bool writeFileSafely(const std::string& path, const std::string& content, std::string& error) const;
 
 public:
-    enum class ModelType
-    {
-        LOGISTIC,
-        KNN,
-        DECISION_TREE,
-        NAIVE_BAYES
-    };
-
-
     CancerDiagnosisSystem();
-    ~CancerDiagnosisSystem();
 
-    // Data acquisition
-    void loadData(const std::string& genesFile, const std::string& patientsFile,
-                  const std::string& patientGenesFile = "data/patient_genes.csv");
-    void addPatient(const Patient& patient);
-    void addGeneticData(const GeneticData& data);
-    // Re-run preprocessing and training on the current genetic data
-    void retrainModels();
-    
-    // Test scheduling
-    void scheduleTest(const Patient &patient);
-    void processTestQueue();
-    // Process test queue and return number processed
-    int processTestQueueAndReturnCount();
-    // Process test queue with selected model and return diagnosis results
-    std::vector<std::string> processTestQueueWithModel(ModelType model);
-    // Query queue state
-    size_t getQueueSize() const;
-    std::vector<std::string> getQueuedPatientIds() const;
+    // Dataset
+    bool loadDataset(const DatasetFiles& f, const std::string& name, std::vector<std::string>& problems);
+    bool loadContent(const DatasetContent& content, const DatasetFiles& f, const std::string& name,
+                     std::vector<std::string>& problems);
+    bool saveDataset(std::string& error) const;
+    bool hasData() const;
+    const std::string& getDatasetName() const;
+    const DatasetFiles& getFiles() const;
+
+    // Training
+    void retrain();
+    bool areModelsTrained() const;
+    const ModelSet& getModels() const;
+    size_t getLabelledCount() const;
+
+    // Patients (linked list)
+    size_t getPatientCount() const;
+    std::vector<const Patient*> patientsInOrder() const;
+    const Patient* findPatient(const std::string& id) const;               // linear search
+    bool searchPatientTrace(const std::string& id, std::vector<std::string>& visitedOrder) const;
+    // status: 200 ok, 400 bad input, 409 duplicate; error set otherwise
+    int addPatient(const NewPatientInput& input, std::vector<GeneReport>& report, std::string& error);
+
+    // Genes
+    const HashMapper& getGenes() const;
+    const std::vector<std::string>& getGeneOrder() const;
 
     // Diagnosis
-    double diagnosePatient(const Patient& patient, ModelType model);
-    int predictPatient(const Patient& patient, ModelType model);
-    
-    // Evaluation
-    void evaluateModels(const std::vector<Patient>& testPatients);
-    // Train temporary models on a stratified 80/20 hold-out split (fixed seed)
-    // and return metrics on the 20% test part. Returns false if no data/models.
-    bool evaluateModelsHoldout(std::vector<ModelEvaluation>& results, size_t& testSamples,
-                               double testRatio = 0.2, unsigned int seed = 42) const;
-    void displayModelMetrics(ModelType model, const std::vector<int>& yTrue, 
-                            const std::vector<int>& yPred) const;
-    
-    // Display
-    void displayGeneticData() const;
-    void displayPatientHistory() const;
-    void displayMutationMappings() const;
-    void displayDecisionTree() const;
+    bool diagnose(const Patient& patient, int k, Diagnosis& out) const;
+    double modelRisk(const Patient& patient, int model, int k = 0) const;
 
-    // Utility
-    size_t getGeneticDataCount() const;
-    size_t getPatientCount() const;
-    bool areModelsTrained() const;
-    bool getPatientById(const std::string &patientId, Patient &outPatient) const;
-    // Linear search of the patient-history linked list from the head.
-    // visitedOrder receives every patient ID visited, in order.
-    bool searchPatientTrace(const std::string &patientId, std::vector<std::string> &visitedOrder) const;
-    // All four models for one patient with explanation data. k > 0 overrides
-    // the KNN K for this call only. Returns false if models are not trained.
-    bool explainPatient(const Patient &patient, int k, DiagnosisExplanation &out) const;
+    // Evaluation (stratified 80/20 split, seed 42)
+    bool evaluate(EvaluationResult& out) const;
 
-    // Data export
-    std::vector<Patient> getAllPatients() const;
-    std::vector<GeneticData> getAllGeneticData() const;
-    const HashMapper& getMutationMapper() const;
-    void saveDataToFiles(const std::string& genesFile, const std::string& patientsFile,
-                         const std::string& patientGenesFile = "data/patient_genes.csv") const;
+    // Test queue
+    bool enqueue(const std::string& id);
+    size_t queueSize() const;
+    std::vector<std::string> queuedIds() const;
+    std::vector<QueueResult> processQueue(int model);
 };
 
 #endif // CANCER_DIAGNOSIS_SYSTEM_H

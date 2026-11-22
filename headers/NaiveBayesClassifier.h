@@ -2,23 +2,26 @@
 #define NAIVE_BAYES_CLASSIFIER_H
 
 #include <vector>
+#include "FeatureExtractor.h"
 
 /**
  * @class NaiveBayesClassifier
  * @brief Gaussian Naive Bayes for two classes (0 = no cancer, 1 = cancer)
  *
- * Statistics are kept in plain arrays indexed by class: prior[c],
- * mean[c][feature], stdDev[c][feature]. Log-probabilities avoid underflow.
+ * Statistics are kept in plain arrays indexed by class and feature:
+ * prior[2], mean[2][NUM_FEATURES], stdDev[2][NUM_FEATURES].
+ * Log-probabilities avoid underflow.
  *
  * Complexity (n samples, f features): fit O(n f), predict O(f) per sample.
  */
 class NaiveBayesClassifier {
 private:
-    double prior[2];                 // P(class)
-    std::vector<double> mean[2];     // mean of each feature, per class
-    std::vector<double> stdDev[2];   // standard deviation of each feature, per class
+    static const int F = FeatureExtractor::NUM_FEATURES;
+
+    double prior[2];          // P(class)
+    double mean[2][F];        // mean of each feature, per class
+    double stdDev[2][F];      // standard deviation of each feature, per class
     bool hasClass[2];
-    size_t nFeatures;
     bool isTrained;
 
     double logGaussian(double x, double m, double s) const;
@@ -37,8 +40,8 @@ public:
     // Utility
     bool getIsTrained() const;
     double getPrior(int cls) const;
-    const std::vector<double>& getMeans(int cls) const;
-    const std::vector<double>& getStds(int cls) const;
+    double getMean(int cls, int feature) const;
+    double getStd(int cls, int feature) const;
 };
 
 #endif // NAIVE_BAYES_CLASSIFIER_H

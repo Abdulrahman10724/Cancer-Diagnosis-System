@@ -6,9 +6,9 @@
 #include <iostream>
 
 DecisionTreeClassifier::DecisionTreeClassifier(int maxDepth, int minSamplesSplit) 
-    : maxDepth(maxDepth), minSamplesSplit(minSamplesSplit), root(nullptr) {}
+    : root(nullptr), maxDepth(maxDepth), minSamplesSplit(minSamplesSplit) {}
 
-double DecisionTreeClassifier::calculateGini(const std::vector<std::vector<double>>& X, 
+double DecisionTreeClassifier::calculateGini(const std::vector<std::vector<double>>& /*X*/,
                                              const std::vector<int>& y) const {
     if (y.empty()) return 1.0;
     
