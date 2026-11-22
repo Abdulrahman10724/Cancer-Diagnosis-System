@@ -1,0 +1,98 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  max-width: 880px;
+}
+
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.fieldset legend {
+  padding: 0;
+  margin-bottom: var(--s2);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.patientFields {
+  display: grid;
+  grid-template-columns: 1fr 2fr 120px;
+  gap: var(--s2);
+}
+
+.geneHead,
+.geneRow {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1.3fr auto;
+  gap: var(--s2);
+  align-items: start;
+}
+
+.geneHead {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.genes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+
+.saved {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--ink);
+}
+
+/* Column headings label the gene fields on wide screens; below 700px each field shows its own label */
+.cellLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .cellLabel {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  .patientFields {
+    grid-template-columns: 1fr;
+  }
+
+  .geneHead {
+    display: none;
+  }
+
+  .geneRow {
+    grid-template-columns: 1fr 1fr;
+    padding: var(--s2) 0;
+    border-bottom: 1px solid var(--rule);
+  }
+}

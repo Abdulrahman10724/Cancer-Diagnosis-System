@@ -1,0 +1,299 @@
+/* The gel bench: the one bold surface in the app */
+.bench {
+  position: relative;
+  background: var(--bench);
+  color: var(--bench-ink);
+  overflow-x: auto;
+  padding: var(--s2) var(--s3) var(--s2) var(--s2);
+}
+
+.bench:focus-visible {
+  outline-offset: 2px;
+}
+
+.gel {
+  position: relative;
+  display: flex;
+  gap: var(--s3);
+  min-width: max-content;
+}
+
+.ladder {
+  position: relative;
+  z-index: 2;
+  width: 96px;
+  flex: none;
+}
+
+.ladderHead {
+  height: 104px;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: var(--s1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--bench-ink);
+}
+
+.ladderTrack {
+  position: relative;
+  height: var(--track-h);
+}
+
+.ladderMark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--bench-ink-muted);
+  transform: translateY(-50%);
+}
+
+.ladderNum {
+  position: relative;
+  z-index: 2;
+  background: var(--bench);
+  padding-right: 2px;
+}
+
+.ladderMark::after {
+  content: '';
+  flex: 1;
+  height: 3px;
+  background: var(--bench-ink-muted);
+  opacity: 0.7;
+}
+
+.ladderEnd {
+  position: absolute;
+  left: 0;
+  font-size: var(--text-xs);
+  color: var(--bench-ink);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+}
+
+.groupHead {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  border-bottom: 1px solid var(--bench-rule);
+  margin-bottom: 8px;
+}
+
+.groupTitle {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.groupName {
+  color: var(--bench-ink-muted);
+  font-weight: 400;
+}
+
+.lanes {
+  display: flex;
+  gap: 4px;
+}
+
+.lane {
+  width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.laneWide {
+  width: 108px;
+  margin-left: var(--s1);
+  border-left: 1px dashed var(--bench-rule);
+}
+
+.laneHead {
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding-bottom: 6px;
+  text-align: center;
+}
+
+.laneTitle {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.swatch {
+  width: 18px;
+  height: 4px;
+}
+
+.track {
+  position: relative;
+  width: 100%;
+  height: var(--track-h);
+  border-left: 1px solid rgba(232, 235, 238, 0.06);
+  border-right: 1px solid rgba(232, 235, 238, 0.06);
+  background: linear-gradient(var(--bench-deep), var(--bench-deep)) center / 64px 100% no-repeat;
+}
+
+.well {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 56px;
+  height: 10px;
+  transform: translateX(-50%);
+  background: #15181B;
+  border: 1px solid var(--bench-rule);
+  border-radius: 50%;
+}
+
+.bandButton {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 72px;
+  margin-left: -36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bench-ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+div.bandButton {
+  cursor: default;
+}
+
+.bandButton:focus-visible {
+  outline: 2px solid var(--bench-ink);
+  outline-offset: 4px;
+}
+
+.band {
+  display: block;
+  width: 56px;
+}
+
+.bandButton:hover .band {
+  outline: 1px solid var(--bench-ink);
+  outline-offset: 3px;
+}
+
+.bandLabel {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.laneFoot {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--text-xs);
+  padding-top: 6px;
+}
+
+.outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-control);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.laneFoot .outcome {
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 6px;
+}
+
+.outcomeRisk {
+  background: var(--risk-tint);
+  color: var(--risk);
+}
+
+.outcomeSafe {
+  background: var(--safe-tint);
+  color: var(--safe);
+}
+
+.threshold {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px dashed var(--bench-ink);
+  pointer-events: none;
+  z-index: 1;
+}
+
+
+.kControl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  margin-left: auto;
+}
+
+.kLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.kOptions {
+  display: inline-flex;
+  border: 1px solid var(--bench-rule);
+  border-radius: var(--radius-control);
+}
+
+.kOption {
+  min-width: 30px;
+  height: 30px;
+  border: 0;
+  border-left: 1px solid var(--bench-rule);
+  background: transparent;
+  color: var(--bench-ink);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.kOption:first-child {
+  border-left: 0;
+}
+
+.kOption[aria-checked='true'] {
+  background: var(--bench-ink);
+  color: var(--bench);
+}
+
+.kOption:focus-visible {
+  outline: 2px solid var(--bench-ink);
+  outline-offset: 1px;
+}
