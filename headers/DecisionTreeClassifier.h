@@ -56,6 +56,7 @@ private:
     bool naiveSplit;
     std::vector<double> importance;
     int nodeCount;
+    long long fitWork; // split-search operations in the last fit
 
     std::shared_ptr<TreeNode> buildTree(const std::vector<std::vector<double>>& X, const std::vector<int>& y,
                                         const std::vector<size_t>& idx, int depth);
@@ -86,6 +87,7 @@ public:
     std::vector<double> featureImportance() const; // total Gini decrease per feature, sums to 1
     int getNodeCount() const;
     int getDepth() const;
+    long long getFitWork() const;
 };
 
 #endif // DECISION_TREE_CLASSIFIER_H

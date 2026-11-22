@@ -2,6 +2,7 @@
 #include "../headers/Json.h"
 #include "../headers/DatasetStore.h"
 #include "../headers/PatientGraph.h"
+#include "../headers/Benchmark.h"
 #include "../headers/Sorting.h"
 #include <cerrno>
 #include <cstdlib>
@@ -989,6 +990,42 @@ int serverMain() {
                << ",\"diagnosis\":" << (p->isLabelled() ? std::to_string(p->getDiagnosis()) : string("null")) << "}";
         }
         ss << "],\"reached\":" << order.size() << ",\"levels\":" << levels << ",\"nodeCount\":" << graph.nodeCount() << "}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /benchmark?n=2000&seed=1 -> timings on synthetic patients (the loaded dataset is not used)
+    svr.Get("/benchmark", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        long n = 2000;
+        long seed = 1;
+        if (req.has_param("n") && (!parseIntParam(req.get_param_value("n"), n) || n < static_cast<long>(Benchmark::MIN_N))) {
+            sendError(res, 400, "n must be a whole number of at least 10 (values above 20000 are capped)");
+            return;
+        }
+        if (req.has_param("seed") && (!parseIntParam(req.get_param_value("seed"), seed) || seed < 0 || seed > 4294967295L)) {
+            sendError(res, 400, "seed must be a whole number from 0 to 4294967295");
+            return;
+        }
+        bool capped = n > static_cast<long>(Benchmark::MAX_N);
+        BenchmarkResult r = Benchmark::run(static_cast<size_t>(n), static_cast<unsigned>(seed));
+        std::ostringstream ss;
+        ss << "{\"n\":" << r.n << ",\"seed\":" << r.seed << ",\"runs\":" << r.runs
+           << ",\"capped\":" << (capped ? "true" : "false") << ",\"timing\":\"best of " << r.runs << ", steady_clock\",\"results\":[";
+        for (size_t i = 0; i < r.tasks.size(); ++i) {
+            const BenchmarkTask& t = r.tasks[i];
+            if (i) ss << ",";
+            ss << "{\"task\":" << jsonString(t.task) << ",\"steps\":" << jsonString(t.stepsMean)
+               << ",\"queries\":" << t.queries << ",\"sameAnswer\":" << (t.sameAnswer ? "true" : "false") << ",\"variants\":[";
+            for (size_t j = 0; j < t.variants.size(); ++j) {
+                const BenchmarkVariant& v = t.variants[j];
+                long long tenths = std::llround(v.micros * 10.0); // fixed notation, one decimal
+                if (j) ss << ",";
+                ss << "{\"name\":" << jsonString(v.name) << ",\"steps\":" << v.steps
+                   << ",\"micros\":" << tenths / 10 << "." << tenths % 10 << "}";
+            }
+            ss << "]}";
+        }
+        ss << "]}";
         sendJson(res, 200, ss.str());
     });
 

@@ -13,6 +13,7 @@ endif()
 
 # Everything except the HTTP server: models, data structures, loader
 add_library(cds_core STATIC
+    src/Benchmark.cpp
     src/CancerDiagnosisSystem.cpp
     src/DataPreprocessor.cpp
     src/DatasetLoader.cpp

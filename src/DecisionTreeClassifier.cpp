@@ -4,7 +4,7 @@
 
 DecisionTreeClassifier::DecisionTreeClassifier(int maxDepth, int minSamplesSplit)
     : root(nullptr), maxDepth(maxDepth), minSamplesSplit(minSamplesSplit), nFeatures(0), nTrain(0),
-      naiveSplit(false), nodeCount(0) {}
+      naiveSplit(false), nodeCount(0), fitWork(0) {}
 
 double DecisionTreeClassifier::gini(size_t n, size_t positives) {
     if (n == 0) return 0.0;
@@ -104,7 +104,7 @@ std::shared_ptr<TreeNode> DecisionTreeClassifier::buildTree(const std::vector<st
     if (depth >= maxDepth || static_cast<int>(n) < minSamplesSplit || pure) {
         return leaf(positives, n);
     }
-    Split s = naiveSplit ? findBestSplitNaive(X, y, idx) : findBestSplitFast(X, y, idx);
+    Split s = naiveSplit ? findBestSplitNaive(X, y, idx, &fitWork) : findBestSplitFast(X, y, idx, &fitWork);
     if (!s.found) return leaf(positives, n);
 
     std::vector<size_t> leftIdx;
@@ -134,6 +134,7 @@ void DecisionTreeClassifier::fit(const std::vector<std::vector<double>>& X, cons
     nTrain = X.size();
     importance.assign(nFeatures, 0.0);
     nodeCount = 0;
+    fitWork = 0;
     std::vector<size_t> idx(X.size());
     for (size_t i = 0; i < idx.size(); ++i) idx[i] = i;
     root = buildTree(X, y, idx, 0);
@@ -192,3 +193,5 @@ static int depthOf(const std::shared_ptr<TreeNode>& node) {
 }
 
 int DecisionTreeClassifier::getDepth() const { return depthOf(root); }
+
+long long DecisionTreeClassifier::getFitWork() const { return fitWork; }
