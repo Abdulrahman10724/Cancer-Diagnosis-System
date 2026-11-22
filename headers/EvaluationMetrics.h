@@ -1,6 +1,7 @@
 #ifndef EVALUATION_METRICS_H
 #define EVALUATION_METRICS_H
 
+#include <utility>
 #include <vector>
 
 /**
@@ -43,6 +44,12 @@ public:
     // Display metrics
     void displayMetrics(const std::vector<int>& yTrue, const std::vector<int>& yPred) const;
     void displayConfusionMatrix(const ConfusionMatrix& cm) const;
+
+    // ROC curve: (false positive rate, true positive rate) points from the highest
+    // risk down; equal risks move together. AUC by the trapezoid rule.
+    // Predictions are ordered with the hand-written merge sort: O(n log n).
+    static std::vector<std::pair<double, double>> rocCurve(const std::vector<int>& yTrue,
+                                                           const std::vector<double>& risk, double& auc);
 };
 
 #endif // EVALUATION_METRICS_H

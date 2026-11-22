@@ -428,7 +428,162 @@ bool CancerDiagnosisSystem::evaluate(EvaluationResult& out) const {
         e.recall = metrics.recall(yTest, yPred);
         e.f1 = metrics.f1Score(yTest, yPred);
         e.confusion = metrics.getConfusionMatrix(yTest, yPred);
+        std::vector<double> risks;
+        for (const auto& smp : e.samples) risks.push_back(smp.risk);
+        e.roc = EvaluationMetrics::rocCurve(yTest, risks, e.auc);
         out.models.push_back(e);
+    }
+    return true;
+}
+
+bool CancerDiagnosisSystem::crossValidate(int k, CrossValidationResult& out) const {
+    if (!models.trained || k < 2 || static_cast<size_t>(k) > y.size()) return false;
+    // folds[f] = test indices of fold f (a 2D index array)
+    std::vector<std::vector<size_t>> folds = Sampling::stratifiedFolds(y, k, EVAL_SEED);
+    out.k = k;
+    out.seed = EVAL_SEED;
+    out.foldSizes.clear();
+    for (int m = 0; m < ModelSet::NUM_MODELS; ++m) out.folds[m].clear();
+    EvaluationMetrics metrics;
+
+    for (int f = 0; f < k; ++f) {
+        std::vector<char> inTest(y.size(), 0);
+        for (size_t i : folds[static_cast<size_t>(f)]) inTest[i] = 1;
+        std::vector<std::vector<double>> Xtr;
+        std::vector<int> ytr;
+        std::vector<int> yTest;
+        for (size_t i = 0; i < y.size(); ++i) {
+            if (inTest[i]) {
+                yTest.push_back(y[i]);
+            } else {
+                Xtr.push_back(Xraw[i]);
+                ytr.push_back(y[i]);
+            }
+        }
+        out.foldSizes.push_back(yTest.size());
+        ModelSet fresh;
+        try {
+            fresh.train(Xtr, ytr);
+        } catch (const std::exception&) {
+            return false;
+        }
+        for (int m = 0; m < ModelSet::NUM_MODELS; ++m) {
+            std::vector<int> yPred;
+            for (size_t i : folds[static_cast<size_t>(f)]) yPred.push_back(fresh.risk(m, Xraw[i]) >= 0.5 ? 1 : 0);
+            out.folds[m].push_back({metrics.accuracy(yTest, yPred), metrics.precision(yTest, yPred),
+                                    metrics.recall(yTest, yPred), metrics.f1Score(yTest, yPred)});
+        }
+    }
+    // Mean and sample standard deviation over the folds
+    for (int m = 0; m < ModelSet::NUM_MODELS; ++m) {
+        for (int j = 0; j < 4; ++j) {
+            double sum = 0.0;
+            for (const auto& fold : out.folds[m]) sum += fold[static_cast<size_t>(j)];
+            double mean = sum / k;
+            double var = 0.0;
+            for (const auto& fold : out.folds[m]) {
+                double d = fold[static_cast<size_t>(j)] - mean;
+                var += d * d;
+            }
+            out.mean[m][j] = mean;
+            out.stdDev[m][j] = std::sqrt(var / (k - 1));
+        }
+    }
+    return true;
+}
+
+bool CancerDiagnosisSystem::featureStats(FeatureStats& out) const {
+    if (!models.trained || Xraw.empty()) return false;
+    const int F = FeatureStats::F;
+    const int B = FeatureStats::BINS;
+    const size_t n = Xraw.size();
+    out.count[0] = out.count[1] = 0;
+    for (int label : y) out.count[label == 1 ? 1 : 0]++;
+
+    auto summarize = [&](int cls, int j) {
+        // cls -1 = all labelled patients
+        FeatureSummary s{0.0, 0.0, 0.0, 0.0};
+        size_t c = 0;
+        for (size_t i = 0; i < n; ++i) {
+            if (cls >= 0 && y[i] != cls) continue;
+            double v = Xraw[i][static_cast<size_t>(j)];
+            if (c == 0) s.min = s.max = v;
+            if (v < s.min) s.min = v;
+            if (v > s.max) s.max = v;
+            s.mean += v;
+            c++;
+        }
+        if (c == 0) return s;
+        s.mean /= c;
+        for (size_t i = 0; i < n; ++i) {
+            if (cls >= 0 && y[i] != cls) continue;
+            double d = Xraw[i][static_cast<size_t>(j)] - s.mean;
+            s.stdDev += d * d;
+        }
+        s.stdDev = c > 1 ? std::sqrt(s.stdDev / (c - 1)) : 0.0;
+        return s;
+    };
+    for (int j = 0; j < F; ++j) {
+        out.overall[j] = summarize(-1, j);
+        out.perClass[0][j] = summarize(0, j);
+        out.perClass[1][j] = summarize(1, j);
+    }
+
+    // Pearson correlation over the 4 features and the diagnosis
+    double col[F + 1];
+    double means[F + 1];
+    double sumSq[F + 1];
+    for (int a = 0; a <= F; ++a) {
+        means[a] = 0.0;
+        sumSq[a] = 0.0;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        for (int a = 0; a < F; ++a) means[a] += Xraw[i][static_cast<size_t>(a)];
+        means[F] += y[i];
+    }
+    for (int a = 0; a <= F; ++a) means[a] /= n;
+    double cov[F + 1][F + 1];
+    for (int a = 0; a <= F; ++a)
+        for (int b = 0; b <= F; ++b) cov[a][b] = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+        for (int a = 0; a < F; ++a) col[a] = Xraw[i][static_cast<size_t>(a)] - means[a];
+        col[F] = y[i] - means[F];
+        for (int a = 0; a <= F; ++a)
+            for (int b = 0; b <= F; ++b) cov[a][b] += col[a] * col[b];
+    }
+    for (int a = 0; a <= F; ++a) sumSq[a] = cov[a][a];
+    for (int a = 0; a <= F; ++a) {
+        for (int b = 0; b <= F; ++b) {
+            double denom = std::sqrt(sumSq[a] * sumSq[b]);
+            out.correlation[a][b] = denom > 0.0 ? cov[a][b] / denom : (a == b ? 1.0 : 0.0);
+        }
+    }
+
+    // Feature importance: |logistic weight| normalized, and the tree's Gini decrease
+    std::vector<double> w = models.logistic.getWeights();
+    double wsum = 0.0;
+    for (int j = 0; j < F; ++j) wsum += std::fabs(w[static_cast<size_t>(j)]);
+    std::vector<double> treeImp = models.tree.featureImportance();
+    for (int j = 0; j < F; ++j) {
+        out.importanceLogistic[j] = wsum > 0.0 ? std::fabs(w[static_cast<size_t>(j)]) / wsum : 0.0;
+        out.importanceTree[j] = static_cast<size_t>(j) < treeImp.size() ? treeImp[static_cast<size_t>(j)] : 0.0;
+    }
+
+    // Histograms: 10 equal-width bins over each feature's range, per class
+    for (int j = 0; j < F; ++j) {
+        double lo = out.overall[j].min;
+        double hi = out.overall[j].max;
+        double width = hi > lo ? (hi - lo) / B : 1.0;
+        out.binStart[j] = lo;
+        out.binWidth[j] = width;
+        for (int c = 0; c < 2; ++c)
+            for (int b = 0; b < B; ++b) out.histogram[c][j][b] = 0;
+        for (size_t i = 0; i < n; ++i) {
+            int b = static_cast<int>((Xraw[i][static_cast<size_t>(j)] - lo) / width);
+            if (b < 0) b = 0;
+            if (b >= B) b = B - 1;
+            out.histogram[y[i] == 1 ? 1 : 0][j][b]++;
+        }
     }
     return true;
 }

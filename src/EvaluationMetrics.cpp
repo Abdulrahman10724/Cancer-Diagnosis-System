@@ -1,4 +1,5 @@
 #include "../headers/EvaluationMetrics.h"
+#include "../headers/Sorting.h"
 #include <iostream>
 #include <iomanip>
 #include <cmath>
@@ -115,3 +116,40 @@ void EvaluationMetrics::displayMetrics(const std::vector<int>& yTrue,
     std::cout << std::endl;
 }
 
+
+std::vector<std::pair<double, double>> EvaluationMetrics::rocCurve(const std::vector<int>& yTrue,
+                                                                   const std::vector<double>& risk, double& auc) {
+    std::vector<std::pair<double, double>> points;
+    points.push_back(std::make_pair(0.0, 0.0));
+    auc = 0.0;
+    size_t pos = 0;
+    size_t neg = 0;
+    for (int label : yTrue) {
+        if (label == 1) pos++;
+        else neg++;
+    }
+    if (pos == 0 || neg == 0 || yTrue.size() != risk.size()) {
+        points.push_back(std::make_pair(1.0, 1.0));
+        return points;
+    }
+    // Ascending order by risk; walk it from the end (highest risk first)
+    std::vector<size_t> order = Sorting::argsortMergeSort(risk);
+    size_t tp = 0;
+    size_t fp = 0;
+    size_t i = order.size();
+    while (i > 0) {
+        double r = risk[order[i - 1]];
+        // Lower the threshold to r: every prediction with this exact risk becomes positive
+        while (i > 0 && risk[order[i - 1]] == r) {
+            if (yTrue[order[i - 1]] == 1) tp++;
+            else fp++;
+            i--;
+        }
+        double fpr = static_cast<double>(fp) / neg;
+        double tpr = static_cast<double>(tp) / pos;
+        const auto& last = points.back();
+        auc += (fpr - last.first) * (tpr + last.second) / 2.0;
+        points.push_back(std::make_pair(fpr, tpr));
+    }
+    return points;
+}

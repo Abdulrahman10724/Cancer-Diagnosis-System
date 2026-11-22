@@ -214,6 +214,26 @@ string diagnoseAllJson(const Patient& p, const Diagnosis& d) {
     return ss.str();
 }
 
+string treeNodeJson(const std::shared_ptr<TreeNode>& node, const DataPreprocessor& scaler) {
+    if (!node) return "null";
+    std::ostringstream ss;
+    bool isLeaf = node->featureIndex < 0;
+    ss << "{\"feature\":" << (isLeaf ? "null" : jsonString(FeatureExtractor::featureNames()[static_cast<size_t>(node->featureIndex)]))
+       << ",\"threshold\":" << (isLeaf ? "null" : jsonNumber(node->threshold))
+       << ",\"thresholdRaw\":" << (isLeaf ? "null" : jsonNumber(scaler.inverseValue(static_cast<size_t>(node->featureIndex), node->threshold)))
+       << ",\"samples\":" << node->sampleCount
+       << ",\"positiveFraction\":" << jsonNumber(node->positiveFraction)
+       << ",\"prediction\":" << node->prediction
+       << ",\"left\":" << treeNodeJson(node->left, scaler)
+       << ",\"right\":" << treeNodeJson(node->right, scaler) << "}";
+    return ss.str();
+}
+
+string summaryJson(const FeatureSummary& s) {
+    return "{\"mean\":" + jsonNumber(s.mean) + ",\"std\":" + jsonNumber(s.stdDev) + ",\"min\":" + jsonNumber(s.min) +
+           ",\"max\":" + jsonNumber(s.max) + "}";
+}
+
 string kdNodeJson(const KDTree& tree, const DataPreprocessor& scaler, const std::vector<const Patient*>& rows,
                   int node, int depth, int maxDepth) {
     if (node < 0) return "null";
@@ -468,6 +488,12 @@ int serverMain() {
                << ",\"recall\":" << jsonNumber(m.recall) << ",\"f1\":" << jsonNumber(m.f1)
                << ",\"confusion\":{\"tp\":" << m.confusion.truePositive << ",\"fp\":" << m.confusion.falsePositive
                << ",\"tn\":" << m.confusion.trueNegative << ",\"fn\":" << m.confusion.falseNegative << "}"
+               << ",\"roc\":{\"points\":[";
+            for (size_t j = 0; j < m.roc.size(); ++j) {
+                if (j) ss << ",";
+                ss << "[" << jsonNumber(m.roc[j].first) << "," << jsonNumber(m.roc[j].second) << "]";
+            }
+            ss << "],\"auc\":" << jsonNumber(m.auc) << "}"
                << ",\"samples\":[";
             for (size_t j = 0; j < m.samples.size(); ++j) {
                 const auto& s = m.samples[j];
@@ -479,6 +505,97 @@ int serverMain() {
             ss << "]}";
         }
         ss << "]}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /crossval?k=5 -> stratified k-fold cross-validation, mean and std per metric
+    svr.Get("/crossval", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        long k = 5;
+        if (req.has_param("k") && (!parseIntParam(req.get_param_value("k"), k) || k < 2 || k > 10)) {
+            sendError(res, 400, "k must be a whole number from 2 to 10");
+            return;
+        }
+        CrossValidationResult cv;
+        if (!system.crossValidate(static_cast<int>(k), cv)) {
+            sendError(res, 400, "Load data first");
+            return;
+        }
+        static const char* METRICS[4] = {"accuracy", "precision", "recall", "f1"};
+        std::ostringstream ss;
+        ss << "{\"k\":" << cv.k << ",\"seed\":" << cv.seed << ",\"foldSizes\":[";
+        for (size_t f = 0; f < cv.foldSizes.size(); ++f) ss << (f ? "," : "") << cv.foldSizes[f];
+        ss << "],\"models\":[";
+        for (int m = 0; m < ModelSet::NUM_MODELS; ++m) {
+            if (m) ss << ",";
+            ss << "{\"key\":" << jsonString(ModelSet::key(m)) << ",\"name\":" << jsonString(ModelSet::name(m));
+            for (int j = 0; j < 4; ++j) {
+                ss << ",\"" << METRICS[j] << "\":{\"mean\":" << jsonNumber(cv.mean[m][j])
+                   << ",\"std\":" << jsonNumber(cv.stdDev[m][j]) << ",\"folds\":[";
+                for (size_t f = 0; f < cv.folds[m].size(); ++f) {
+                    if (f) ss << ",";
+                    ss << jsonNumber(cv.folds[m][f][static_cast<size_t>(j)]);
+                }
+                ss << "]}";
+            }
+            ss << "}";
+        }
+        ss << "]}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /features -> feature statistics, correlation matrix, importance and histograms
+    svr.Get("/features", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        FeatureStats fs;
+        if (!system.featureStats(fs)) {
+            sendError(res, 400, "Load data first");
+            return;
+        }
+        const auto& names = FeatureExtractor::featureNames();
+        const int F = FeatureStats::F;
+        std::ostringstream ss;
+        ss << "{\"featureNames\":" << featureNamesJson()
+           << ",\"labelled\":{\"noCancer\":" << fs.count[0] << ",\"cancer\":" << fs.count[1] << "},\"features\":[";
+        for (int j = 0; j < F; ++j) {
+            if (j) ss << ",";
+            ss << "{\"name\":" << jsonString(names[static_cast<size_t>(j)])
+               << ",\"overall\":" << summaryJson(fs.overall[j])
+               << ",\"noCancer\":" << summaryJson(fs.perClass[0][j])
+               << ",\"cancer\":" << summaryJson(fs.perClass[1][j])
+               << ",\"importance\":{\"logistic\":" << jsonNumber(fs.importanceLogistic[j])
+               << ",\"tree\":" << jsonNumber(fs.importanceTree[j]) << "}"
+               << ",\"histogram\":{\"binStart\":" << jsonNumber(fs.binStart[j])
+               << ",\"binWidth\":" << jsonNumber(fs.binWidth[j]) << ",\"noCancer\":[";
+            for (int b = 0; b < FeatureStats::BINS; ++b) ss << (b ? "," : "") << fs.histogram[0][j][b];
+            ss << "],\"cancer\":[";
+            for (int b = 0; b < FeatureStats::BINS; ++b) ss << (b ? "," : "") << fs.histogram[1][j][b];
+            ss << "]}}";
+        }
+        ss << "],\"correlation\":{\"labels\":[";
+        for (int a = 0; a < F; ++a) ss << jsonString(names[static_cast<size_t>(a)]) << ",";
+        ss << "\"diagnosis\"],\"matrix\":[";
+        for (int a = 0; a <= F; ++a) {
+            if (a) ss << ",";
+            ss << "[";
+            for (int b = 0; b <= F; ++b) ss << (b ? "," : "") << jsonNumber(fs.correlation[a][b]);
+            ss << "]";
+        }
+        ss << "]}}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /tree -> the decision tree as nested nodes
+    svr.Get("/tree", [&](const httplib::Request&, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        if (!system.areModelsTrained()) {
+            sendError(res, 400, "Load data first");
+            return;
+        }
+        const ModelSet& m = system.getModels();
+        std::ostringstream ss;
+        ss << "{\"depth\":" << m.tree.getDepth() << ",\"nodeCount\":" << m.tree.getNodeCount()
+           << ",\"root\":" << treeNodeJson(m.tree.getRoot(), m.scaler) << "}";
         sendJson(res, 200, ss.str());
     });
 

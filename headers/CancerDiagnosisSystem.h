@@ -86,6 +86,8 @@ struct ModelEvaluation {
     double f1;
     ConfusionMatrix confusion;
     std::vector<EvalSample> samples;
+    std::vector<std::pair<double, double>> roc; // (FPR, TPR)
+    double auc;
 };
 
 struct EvaluationResult {
@@ -93,6 +95,39 @@ struct EvaluationResult {
     size_t testCount;
     unsigned seed;
     std::vector<ModelEvaluation> models;
+};
+
+// ---- K-fold cross-validation ----
+struct CrossValidationResult {
+    int k;
+    unsigned seed;
+    // metric index: 0 accuracy, 1 precision, 2 recall, 3 f1
+    std::vector<std::vector<double>> folds[ModelSet::NUM_MODELS]; // [model][fold][metric]
+    double mean[ModelSet::NUM_MODELS][4];
+    double stdDev[ModelSet::NUM_MODELS][4];
+    std::vector<size_t> foldSizes;
+};
+
+// ---- Feature statistics ----
+struct FeatureSummary {
+    double mean;
+    double stdDev;
+    double min;
+    double max;
+};
+
+struct FeatureStats {
+    static const int F = FeatureExtractor::NUM_FEATURES;
+    static const int BINS = 10;
+    size_t count[2];                 // labelled patients per class
+    FeatureSummary overall[F];       // all labelled patients
+    FeatureSummary perClass[2][F];   // by diagnosis
+    double correlation[F + 1][F + 1]; // Pearson; last row/column is Diagnosis
+    double importanceLogistic[F];
+    double importanceTree[F];
+    double binStart[F];
+    double binWidth[F];
+    int histogram[2][F][BINS];       // [class][feature][bin]
 };
 
 // ---- Adding a patient ----
@@ -192,6 +227,10 @@ public:
 
     // Evaluation (stratified 80/20 split, seed 42)
     bool evaluate(EvaluationResult& out) const;
+    // Stratified k-fold cross-validation (seed 42)
+    bool crossValidate(int k, CrossValidationResult& out) const;
+    // Feature statistics, correlation, importance and histograms (labelled patients)
+    bool featureStats(FeatureStats& out) const;
 
     // Test queue
     bool enqueue(const std::string& id);
