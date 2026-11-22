@@ -569,15 +569,12 @@ bool CancerDiagnosisSystem::explainPatient(const Patient& patient, int k,
     out.dtRisk = decisionTreeModel->predictProbabilitySingle(features);
     
     // Naive Bayes: per-class Gaussian on the scaled feature
-    auto prior = naiveBayesModel->getClassPrior();
-    auto mean = naiveBayesModel->getClassMean();
-    auto stdev = naiveBayesModel->getClassStd();
-    out.nbSafePrior = prior.count(0) ? prior[0] : 0.0;
-    out.nbCancerPrior = prior.count(1) ? prior[1] : 0.0;
-    out.nbSafeMean = mean.count(0) ? mean[0][0] : 0.0;
-    out.nbCancerMean = mean.count(1) ? mean[1][0] : 0.0;
-    out.nbSafeStd = stdev.count(0) ? stdev[0][0] : 1.0;
-    out.nbCancerStd = stdev.count(1) ? stdev[1][0] : 1.0;
+    out.nbSafePrior = naiveBayesModel->getPrior(0);
+    out.nbCancerPrior = naiveBayesModel->getPrior(1);
+    out.nbSafeMean = naiveBayesModel->getMeans(0).empty() ? 0.0 : naiveBayesModel->getMeans(0)[0];
+    out.nbCancerMean = naiveBayesModel->getMeans(1).empty() ? 0.0 : naiveBayesModel->getMeans(1)[0];
+    out.nbSafeStd = naiveBayesModel->getStds(0).empty() ? 1.0 : naiveBayesModel->getStds(0)[0];
+    out.nbCancerStd = naiveBayesModel->getStds(1).empty() ? 1.0 : naiveBayesModel->getStds(1)[0];
     out.nbRisk = naiveBayesModel->predictProbabilitySingle(features);
     
     return true;

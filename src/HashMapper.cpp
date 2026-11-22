@@ -4,9 +4,35 @@
 #include <stdexcept>
 
 HashMapper::HashMapper() : buckets(INITIAL_BUCKETS), itemCount(0) {
-    // Initialize default label mappings
-    labelToCategoryMap[0] = "Non-Cancerous";
-    labelToCategoryMap[1] = "Cancerous";
+    labelToCategory[0] = "Non-Cancerous";
+    labelToCategory[1] = "Cancerous";
+}
+
+HashMapper::HashMapper(const HashMapper& other) : itemCount(0) {
+    copyFrom(other);
+}
+
+HashMapper& HashMapper::operator=(const HashMapper& other) {
+    if (this != &other) {
+        copyFrom(other);
+    }
+    return *this;
+}
+
+void HashMapper::copyFrom(const HashMapper& other) {
+    // Deep copy: same bucket count and the same chain order in every bucket
+    buckets.clear();
+    buckets.resize(other.buckets.size());
+    for (size_t i = 0; i < other.buckets.size(); ++i) {
+        std::unique_ptr<HashNode>* tail = &buckets[i];
+        for (const HashNode* node = other.buckets[i].get(); node; node = node->next.get()) {
+            *tail = std::unique_ptr<HashNode>(new HashNode(node->key, node->value));
+            tail = &(*tail)->next;
+        }
+    }
+    itemCount = other.itemCount;
+    labelToCategory[0] = other.labelToCategory[0];
+    labelToCategory[1] = other.labelToCategory[1];
 }
 
 uint64_t HashMapper::hashKey(const std::string& key) {
@@ -23,91 +49,139 @@ size_t HashMapper::bucketIndex(const std::string& key) const {
 }
 
 void HashMapper::rehash(size_t newBucketCount) {
-    std::vector<std::list<std::pair<std::string, double>>> newBuckets(newBucketCount);
-    for (const auto& bucket : buckets) {
-        for (const auto& item : bucket) {
-            newBuckets[hashKey(item.first) % newBucketCount].push_back(item);
+    std::vector<std::unique_ptr<HashNode>> newBuckets(newBucketCount);
+    for (auto& head : buckets) {
+        // Move every node to the tail of its new chain (keeps relative order)
+        std::unique_ptr<HashNode> node = std::move(head);
+        while (node) {
+            std::unique_ptr<HashNode> rest = std::move(node->next);
+            size_t idx = static_cast<size_t>(hashKey(node->key) % newBucketCount);
+            std::unique_ptr<HashNode>* tail = &newBuckets[idx];
+            while (*tail) tail = &(*tail)->next;
+            *tail = std::move(node);
+            node = std::move(rest);
         }
     }
     buckets.swap(newBuckets);
 }
 
-void HashMapper::addMutationMapping(const std::string& mutation, double riskScore) {
-    // Update the value if the key already exists (same behaviour as map[key] = value)
-    auto& bucket = buckets[bucketIndex(mutation)];
-    for (auto& item : bucket) {
-        if (item.first == mutation) {
-            item.second = riskScore;
-            return;
+bool HashMapper::put(const std::string& key, double value) {
+    std::unique_ptr<HashNode>* slot = &buckets[bucketIndex(key)];
+    while (*slot) {
+        if ((*slot)->key == key) {
+            (*slot)->value = value;
+            return false;
         }
+        slot = &(*slot)->next;
     }
-    
-    bucket.push_back({mutation, riskScore});
+    // Append at the end of the chain
+    *slot = std::unique_ptr<HashNode>(new HashNode(key, value));
     itemCount++;
-    
     if (loadFactor() > MAX_LOAD_FACTOR) {
         rehash(buckets.size() * 2);
     }
+    return true;
 }
 
-double HashMapper::getRiskScore(const std::string& mutation) const {
-    for (const auto& item : buckets[bucketIndex(mutation)]) {
-        if (item.first == mutation) {
-            return item.second;
-        }
-    }
-    return 0.0; // Default risk score if mutation not found
-}
-
-bool HashMapper::hasMutation(const std::string& mutation) const {
-    for (const auto& item : buckets[bucketIndex(mutation)]) {
-        if (item.first == mutation) {
+bool HashMapper::get(const std::string& key, double& out, int* steps) const {
+    int visited = 0;
+    for (const HashNode* node = buckets[bucketIndex(key)].get(); node; node = node->next.get()) {
+        visited++;
+        if (node->key == key) {
+            if (steps) *steps += visited;
+            out = node->value;
             return true;
         }
+    }
+    if (steps) *steps += (visited == 0 ? 1 : visited);
+    return false;
+}
+
+bool HashMapper::erase(const std::string& key) {
+    std::unique_ptr<HashNode>* slot = &buckets[bucketIndex(key)];
+    while (*slot) {
+        if ((*slot)->key == key) {
+            std::unique_ptr<HashNode> removed = std::move(*slot);
+            *slot = std::move(removed->next);
+            itemCount--;
+            return true;
+        }
+        slot = &(*slot)->next;
     }
     return false;
 }
 
+void HashMapper::clear() {
+    buckets.clear();
+    buckets.resize(INITIAL_BUCKETS);
+    itemCount = 0;
+}
+
+void HashMapper::addMutationMapping(const std::string& mutation, double riskScore) {
+    put(mutation, riskScore);
+}
+
+double HashMapper::getRiskScore(const std::string& mutation) const {
+    double value = 0.0;
+    return get(mutation, value) ? value : 0.0; // 0.0 if the mutation is not found
+}
+
+bool HashMapper::hasMutation(const std::string& mutation) const {
+    double value = 0.0;
+    return get(mutation, value);
+}
+
 void HashMapper::setLabelCategory(int label, const std::string& category) {
-    labelToCategoryMap[label] = category;
+    if (label == 0 || label == 1) {
+        labelToCategory[label] = category;
+    }
 }
 
 std::string HashMapper::getCategory(int label) const {
-    auto it = labelToCategoryMap.find(label);
-    if (it != labelToCategoryMap.end()) {
-        return it->second;
+    if (label == 0 || label == 1) {
+        return labelToCategory[label];
     }
     return "Unknown";
 }
 
-void HashMapper::buildMutationMap(const std::vector<std::string>& mutations, 
+void HashMapper::buildMutationMap(const std::vector<std::string>& mutations,
                                   const std::vector<double>& riskScores) {
     if (mutations.size() != riskScores.size()) {
         throw std::runtime_error("Mutations and risk scores must have the same size");
     }
-    
     for (size_t i = 0; i < mutations.size(); ++i) {
-        addMutationMapping(mutations[i], riskScores[i]);
+        put(mutations[i], riskScores[i]);
     }
 }
 
 void HashMapper::displayMappings() const {
     std::cout << "\n=== Mutation to Risk Mappings ===" << std::endl;
-    for (const auto& bucket : buckets) {
-        for (const auto& pair : bucket) {
-            std::cout << "Mutation: " << std::setw(15) << pair.first 
-                      << " -> Risk Score: " << std::fixed << std::setprecision(4) << pair.second << std::endl;
+    for (const auto& head : buckets) {
+        for (const HashNode* node = head.get(); node; node = node->next.get()) {
+            std::cout << "Mutation: " << std::setw(15) << node->key
+                      << " -> Risk Score: " << std::fixed << std::setprecision(4) << node->value << std::endl;
         }
     }
     std::cout << "\n=== Label to Category Mappings ===" << std::endl;
-    for (const auto& pair : labelToCategoryMap) {
-        std::cout << "Label: " << pair.first << " -> Category: " << pair.second << std::endl;
+    for (int label = 0; label < 2; ++label) {
+        std::cout << "Label: " << label << " -> Category: " << labelToCategory[label] << std::endl;
     }
     std::cout << "==================================\n" << std::endl;
 }
 
 size_t HashMapper::size() const {
     return itemCount;
+}
+
+std::vector<std::string> HashMapper::keys() const {
+    std::vector<std::string> out;
+    out.reserve(itemCount);
+    for (const auto& head : buckets) {
+        for (const HashNode* node = head.get(); node; node = node->next.get()) {
+            out.push_back(node->key);
+        }
+    }
+    return out;
 }
 
 size_t HashMapper::bucketCount() const {
@@ -118,6 +192,6 @@ double HashMapper::loadFactor() const {
     return static_cast<double>(itemCount) / buckets.size();
 }
 
-const std::list<std::pair<std::string, double>>& HashMapper::bucketAt(size_t index) const {
-    return buckets.at(index);
+const HashNode* HashMapper::bucketHead(size_t index) const {
+    return buckets.at(index).get();
 }

@@ -462,11 +462,11 @@ int serverMain() {
             if (i) ss << ",";
             ss << "{\"index\":" << i << ",\"items\":[";
             bool first = true;
-            for (const auto& item : map.bucketAt(i)) {
+            for (const HashNode* node = map.bucketHead(i); node; node = node->next.get()) {
                 if (!first) ss << ",";
                 first = false;
-                ss << "{\"key\":\"" << json_escape(item.first) << "\",\"value\":" << item.second
-                   << ",\"hash\":" << HashMapper::hashKey(item.first) << "}";
+                ss << "{\"key\":\"" << json_escape(node->key) << "\",\"value\":" << node->value
+                   << ",\"hash\":" << HashMapper::hashKey(node->key) << "}";
             }
             ss << "]}";
         }
