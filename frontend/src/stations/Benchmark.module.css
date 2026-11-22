@@ -115,6 +115,17 @@
   font-size: var(--t28);
 }
 
+.factor {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.fasterWord {
+  color: var(--on-night-muted);
+  font-size: var(--t13);
+}
+
 .steps {
   grid-column: 2 / -1;
   display: none;
@@ -200,6 +211,6 @@
   }
 
   .arrival {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

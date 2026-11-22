@@ -148,6 +148,7 @@ label.choose:has(+ input:focus-visible) {
 }
 
 .tableWrap {
+  position: relative;
   overflow-x: auto;
 }
 
@@ -349,7 +350,7 @@ label.choose:has(+ input:focus-visible) {
 
 @media (max-width: 860px) {
   .drops {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .strip {

@@ -112,7 +112,8 @@ export default function MetroDiagram({
                 {...fadeAnim(lineDelay(j) + along(s, trackStart, t.length) * lineDur)}
               />
             ))}
-            <motion.path d={t.d} className={styles.track} {...pathAnim(lineDelay(j), lineDur)} />
+            {t.lead && <motion.path d={t.lead} className={styles.lead} {...fadeAnim(lineDelay(j))} />}
+            <motion.path d={t.active} className={styles.track} {...pathAnim(lineDelay(j), lineDur)} />
             {t.stops.map((s) => (
               <motion.circle
                 key={`dot-${s.id}`}

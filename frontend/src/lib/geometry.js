@@ -22,9 +22,12 @@ function horizontal() {
     const y = 206 + j * 40;
     const stopsAt = line.stops.map((id) => at(id));
     const end = stopsAt[stopsAt.length - 1].x;
+    const begin = stopsAt[0].x;
     return {
       ...line,
       d: `M${trackStart},${y} H${end}`,
+      lead: begin - 14 > trackStart ? `M${trackStart},${y} H${begin - 14}` : null,
+      active: `M${Math.max(begin - 14, trackStart)},${y} H${end}`,
       length: end - trackStart,
       stops: stopsAt.map((s) => ({ id: s.id, x: s.x, y, connector: `M${s.x},${y} V${coreY}` })),
       label: { x: nameX, y: y + 5, anchor: 'end' },
@@ -54,9 +57,12 @@ function vertical() {
     const x = 26 + j * 26;
     const stopsAt = line.stops.map((id) => at(id));
     const end = stopsAt[stopsAt.length - 1].y;
+    const begin = stopsAt[0].y;
     return {
       ...line,
       d: `M${x},${trackTop} V${end}`,
+      lead: begin - 14 > trackTop ? `M${x},${trackTop} V${begin - 14}` : null,
+      active: `M${x},${Math.max(begin - 14, trackTop)} V${end}`,
       length: end - trackTop,
       stops: stopsAt.map((s) => ({ id: s.id, x, y: s.y, connector: `M${x},${s.y} H${coreX}` })),
       label: { x: x + 5, y: trackTop - 10, anchor: 'start', rotate: true },

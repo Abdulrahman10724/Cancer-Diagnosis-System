@@ -156,6 +156,7 @@ function Board({ data }) {
                   </span>
                   <span className={`${styles.factor} ${styles.right}`}>
                     <SplitFlap text={`${factor >= 10 ? Math.round(factor) : factor.toFixed(1)}×`} delay={delay + 0.1} />
+                    <span className={styles.fasterWord}>faster</span>
                   </span>
                   <span className={styles.steps} aria-hidden={open !== id}>
                     Steps: {simple.steps.toLocaleString('en-US')} the simple way, {v.steps.toLocaleString('en-US')} with the{' '}

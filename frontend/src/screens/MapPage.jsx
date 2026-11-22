@@ -99,8 +99,8 @@ export default function MapPage() {
             This is a data-science pipeline. Each station is one step; each coloured line is a data structure we wrote,
             and it stops where it does real work.
           </p>
-          <Link to={`/station/${current.id}`} className="btn btn-night">
-            {allDone ? 'Ride again from Benchmark' : doneCount === 0 ? 'Start at Data' : `Continue to ${current.name}`}
+          <Link to={`/station/${allDone ? 'data' : current.id}`} className="btn btn-night">
+            {allDone ? 'Ride again from Data' : doneCount === 0 ? 'Start at Data' : `Continue to ${current.name}`}
           </Link>
         </div>
 

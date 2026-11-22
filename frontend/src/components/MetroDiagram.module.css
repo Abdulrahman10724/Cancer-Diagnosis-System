@@ -28,6 +28,15 @@
   stroke-linecap: round;
 }
 
+.lead {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
 .connector {
   fill: none;
   stroke: var(--c);

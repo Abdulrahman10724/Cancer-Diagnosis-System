@@ -313,7 +313,7 @@
 
   /* The route becomes a vertical line */
   .route {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     row-gap: 0;
     padding-left: 0;
   }
@@ -344,7 +344,7 @@
   }
 
   .numbers {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .numberValue {
