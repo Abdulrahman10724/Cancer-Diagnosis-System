@@ -48,3 +48,27 @@
   padding: 0 12px;
   font-size: var(--t15);
 }
+
+/* On a night surface */
+:global(.on-night) .group {
+  background: var(--night-2);
+}
+
+:global(.on-night) .option {
+  color: var(--on-night-muted);
+}
+
+:global(.on-night) .option:hover {
+  color: var(--on-night);
+}
+
+:global(.on-night) .on,
+:global(.on-night) .on:hover {
+  background: var(--on-night);
+  color: var(--night);
+  box-shadow: none;
+}
+
+:global(.on-night) .option:has(.input:focus-visible) {
+  outline-color: var(--on-night);
+}

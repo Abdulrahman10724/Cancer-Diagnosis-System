@@ -77,3 +77,9 @@ export const PROOF_FALLBACK = proofFrom({
     },
   ],
 });
+
+export function formatTime(us) {
+  if (us < 1000) return `${us < 10 ? us.toFixed(1) : Math.round(us)} µs`;
+  if (us < 1e6) return `${(us / 1000).toFixed(us < 1e4 ? 2 : 1)} ms`;
+  return `${(us / 1e6).toFixed(2)} s`;
+}

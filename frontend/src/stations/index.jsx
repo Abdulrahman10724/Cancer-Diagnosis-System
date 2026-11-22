@@ -4,12 +4,8 @@ import Scale from './Scale';
 import Split from './Split';
 import Train from './Train';
 import Predict from './Predict';
-import Placeholder from './Placeholder';
-
-const make = (id) =>
-  function Station() {
-    return <Placeholder id={id} />;
-  };
+import Evaluate from './Evaluate';
+import Benchmark from './Benchmark';
 
 export const STATION_SCREENS = {
   data: Data,
@@ -18,6 +14,6 @@ export const STATION_SCREENS = {
   split: Split,
   train: Train,
   predict: Predict,
-  evaluate: make('evaluate'),
-  benchmark: make('benchmark'),
+  evaluate: Evaluate,
+  benchmark: Benchmark,
 };

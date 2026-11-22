@@ -11,7 +11,7 @@ import styles from './StationLayout.module.css';
  * the lines that stop here, and previous / next.
  * `todo` says what finishes this station (shown while Next is disabled).
  */
-export default function StationLayout({ id, sentence, todo, children, details, resultNote = false, wide = false }) {
+export default function StationLayout({ id, sentence, todo, children, details, resultNote = false, wide = false, night = false }) {
   const { isDone } = useJourney();
   const i = stationIndex(id);
   const station = STATIONS[i];
@@ -28,7 +28,7 @@ export default function StationLayout({ id, sentence, todo, children, details, r
           <p className={styles.sentence}>{sentence}</p>
         </header>
 
-        <section className={styles.panel} aria-label={`${station.name} station`}>
+        <section className={`${styles.panel} ${night ? `${styles.night} on-night` : ''}`} aria-label={`${station.name} station`}>
           {children}
         </section>
 

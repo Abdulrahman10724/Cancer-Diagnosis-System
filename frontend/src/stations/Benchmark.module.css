@@ -1,0 +1,205 @@
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.meta,
+.dim {
+  color: var(--on-night-muted);
+  font-size: var(--t15);
+}
+
+.loading,
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s1);
+  margin-top: var(--s4);
+  padding: var(--s3);
+  border: 1px solid var(--night-2);
+  border-radius: var(--r);
+}
+
+.loadingTitle {
+  font-size: var(--t20);
+  font-weight: 700;
+}
+
+.board {
+  margin-top: var(--s3);
+  display: flex;
+  flex-direction: column;
+}
+
+.boardHead,
+.row {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) minmax(0, 1fr) 110px;
+  gap: var(--s2);
+  align-items: center;
+}
+
+.boardHead {
+  padding: 0 var(--s2) var(--s1);
+  color: var(--on-night-muted);
+  font-size: var(--t13);
+  font-weight: 600;
+}
+
+.right {
+  justify-self: end;
+  text-align: right;
+}
+
+.task {
+  border-top: 1px solid var(--night-2);
+}
+
+.row {
+  padding: 12px var(--s2);
+  border-radius: var(--r);
+  outline: none;
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--on-night);
+  outline-offset: -2px;
+}
+
+.rowOpen {
+  background: var(--night-2);
+}
+
+.taskName {
+  font-weight: 700;
+}
+
+.cellSimple,
+.cellOurs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vname {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t15);
+  color: var(--on-night-muted);
+}
+
+.cellOurs .vname {
+  color: var(--on-night);
+  font-weight: 600;
+}
+
+.swatch {
+  width: 22px;
+  height: 4px;
+  border-radius: var(--pill);
+  flex: none;
+}
+
+.cellSimple :global(span[role='img']),
+.cellOurs :global(span[role='img']) {
+  font-size: var(--t20);
+}
+
+.factor :global(span[role='img']) {
+  font-size: var(--t28);
+}
+
+.steps {
+  grid-column: 2 / -1;
+  display: none;
+  color: var(--on-night-muted);
+  font-size: var(--t13);
+}
+
+.rowOpen .steps {
+  display: block;
+}
+
+.arrival {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) 1fr;
+  align-items: center;
+  gap: var(--s4);
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--night-2);
+}
+
+.arrival > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s1);
+}
+
+.arrivalSvg {
+  width: 100%;
+  height: auto;
+}
+
+.arrivalLine {
+  stroke: var(--rail);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.arrivalStop {
+  fill: var(--on-night);
+  stroke: var(--night);
+  stroke-width: 3;
+}
+
+.arrivalTrain :global(.train-body) {
+  fill: var(--on-night);
+}
+
+.arrivalTrain :global(.train-window) {
+  fill: var(--night);
+}
+
+.arrivalTitle {
+  font-size: var(--t28);
+  font-weight: 800;
+}
+
+@media (max-width: 860px) {
+  .boardHead {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .taskName {
+    grid-column: 1 / -1;
+  }
+
+  .taskName:empty {
+    display: none;
+  }
+
+  .factor {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .steps {
+    grid-column: 1 / -1;
+  }
+
+  .arrival {
+    grid-template-columns: 1fr;
+  }
+}
