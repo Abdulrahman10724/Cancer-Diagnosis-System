@@ -11,6 +11,10 @@
  * mergeSortBy sorts any vector with a "less" comparator. It is stable: equal
  * elements keep their original order. Complexity O(n log n) time, O(n) extra
  * memory. The optional counter adds the number of comparisons made.
+ *
+ * Used by: the KD-tree (median per level), the decision tree split search
+ * (rows ordered by each feature), the ROC curve (predictions ordered by risk),
+ * KNN brute-force mode and the benchmark.
  */
 namespace Sorting {
 
@@ -47,6 +51,12 @@ void mergeSortBy(std::vector<T>& a, Less less, long long* comparisons = nullptr)
     std::vector<T> buf(a.size());
     mergeSortRange(a, buf, 0, a.size(), less, comparisons);
 }
+
+// Sorted copy of values (ascending)
+std::vector<double> mergeSort(const std::vector<double>& values, long long* comparisons = nullptr);
+
+// Stable argsort: indices that put values in ascending order (equal values keep index order)
+std::vector<size_t> argsortMergeSort(const std::vector<double>& values, long long* comparisons = nullptr);
 
 } // namespace Sorting
 
