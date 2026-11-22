@@ -5,7 +5,7 @@ import Shell from './components/Shell';
 import Home from './screens/Home';
 import Start from './screens/Start';
 import AddPatient from './screens/Accession';
-import CheckRisk from './screens/Gel';
+import CheckRisk from './screens/CheckRisk';
 import WaitingList from './screens/Rack';
 import Report from './screens/Report';
 import Accuracy from './screens/Proficiency';

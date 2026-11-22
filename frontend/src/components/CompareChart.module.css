@@ -1,0 +1,91 @@
+.figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.caption {
+  font-weight: 700;
+  font-size: var(--text-md);
+}
+
+.chart {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 24px;
+  --label-w: 170px;
+  --value-w: 48px;
+}
+
+.lineWrap {
+  position: absolute;
+  top: 0;
+  bottom: -6px;
+  left: calc(var(--label-w) + 12px + (100% - var(--label-w) - var(--value-w) - 24px) / 2);
+  pointer-events: none;
+}
+
+.line {
+  position: absolute;
+  top: 20px;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+
+.lineLabel {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--label-w) 1fr var(--value-w);
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.track {
+  height: 14px;
+  border-radius: 999px;
+  background: #EDF0F5;
+  overflow: hidden;
+}
+
+.bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.value {
+  text-align: right;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .chart {
+    --label-w: 104px;
+  }
+
+  .label {
+    font-size: var(--text-xs);
+  }
+}
