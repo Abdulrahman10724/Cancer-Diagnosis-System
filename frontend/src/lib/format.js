@@ -36,9 +36,3 @@ export const RISK_WORD = { low: 'Low risk', medium: 'Medium risk', high: 'High r
 export const outcomeWord = (prediction) => (prediction === 1 ? 'cancer' : 'no cancer');
 
 export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-// Band geometry used by the legacy gel screen (removed with it)
-export function bandShape(risk) {
-  const c = certainty(risk);
-  return { height: 6 + (1 - c) * 22, blur: (1 - c) * 5 };
-}

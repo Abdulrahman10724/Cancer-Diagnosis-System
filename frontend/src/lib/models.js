@@ -5,8 +5,6 @@ export const MODELS = [
     name: 'Logistic Regression',
     short: 'Logistic Regression',
     color: 'var(--lr)',
-    stain: 'var(--stain-lr)',
-    gel: 'var(--gel-lr)',
     idea: 'Turns the gene score into a chance using an S-shaped curve.',
   },
   {
@@ -14,8 +12,6 @@ export const MODELS = [
     name: 'K-Nearest Neighbors',
     short: 'KNN',
     color: 'var(--knn)',
-    stain: 'var(--stain-knn)',
-    gel: 'var(--gel-knn)',
     idea: 'Finds the training genes most similar to this patient and lets them vote.',
   },
   {
@@ -23,8 +19,6 @@ export const MODELS = [
     name: 'Decision Tree',
     short: 'Decision Tree',
     color: 'var(--dt)',
-    stain: 'var(--stain-dt)',
-    gel: 'var(--gel-dt)',
     idea: 'Asks a few yes/no questions about the score, like a flowchart.',
   },
   {
@@ -32,8 +26,6 @@ export const MODELS = [
     name: 'Naive Bayes',
     short: 'Naive Bayes',
     color: 'var(--nb)',
-    stain: 'var(--stain-nb)',
-    gel: 'var(--gel-nb)',
     idea: 'Compares how normal genes and cancer genes usually score, and picks the closer group.',
   },
 ];

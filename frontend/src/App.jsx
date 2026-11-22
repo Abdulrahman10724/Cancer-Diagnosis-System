@@ -8,9 +8,9 @@ import AddPatient from './screens/AddPatient';
 import CheckRisk from './screens/CheckRisk';
 import WaitingList from './screens/WaitingList';
 import Report from './screens/PatientReport';
-import Accuracy from './screens/Proficiency';
-import LinkedList from './screens/Custody';
-import HashTable from './screens/Freezer';
+import Accuracy from './screens/Accuracy';
+import LinkedList from './screens/LinkedList';
+import HashTable from './screens/HashTable';
 
 export default function App() {
   const location = useLocation();
