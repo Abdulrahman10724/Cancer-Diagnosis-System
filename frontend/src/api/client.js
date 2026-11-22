@@ -39,6 +39,9 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     response = await fetch(base + path, {
       method,
       signal,
+      // Never reuse or wait on the browser cache: a second identical request (e.g. two
+      // benchmarks) must reach the server instead of queueing behind the first one
+      cache: 'no-store',
       headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });

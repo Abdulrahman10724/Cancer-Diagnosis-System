@@ -8,6 +8,7 @@ import { Empty, ErrorState, Loading } from '../components/States';
 import { Term } from '../components/Popover';
 import { hashSteps } from '../lib/hash';
 import useApi from '../lib/useApi';
+import useElapsed from '../lib/useElapsed';
 import { useJourney } from '../state/Journey';
 import styles from './Data.module.css';
 
@@ -17,10 +18,29 @@ const FILES = [
   { key: 'patientGenesCsv', title: 'Patient–gene links', file: 'patient_genes.csv', header: 'Patient_ID,Gene_ID' },
 ];
 const MAX_BYTES = 5 * 1024 * 1024;
+const BUSY_UPLOAD_S = 15;
+const BUSY_LIST_S = 10;
+const BUSY_TEXT = 'The server is busy — this can happen while a benchmark is running.';
+const EMPTY_UPLOAD = { name: '', nameEdited: false, files: {} };
+
+// "My Patients_2024.csv" -> "my-patients-2024"
+function nameFromFile(fileName) {
+  return fileName
+    .replace(/\.[^.]*$/, '')
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40)
+    .replace(/-$/, '');
+}
 
 export default function Data() {
   const { journey, isDone, datasetLoaded } = useJourney();
   const [source, setSource] = useState('sample');
+  // The upload form lives here so its files and name survive switching tabs
+  const [upload, setUpload] = useState(EMPTY_UPLOAD);
   const [loadedAt, setLoadedAt] = useState(0); // bumps after every successful load
   const loaded = isDone('data') && journey.dataset;
 
@@ -51,7 +71,7 @@ export default function Data() {
 
       <div className={styles.source}>
         {source === 'sample' && <SampleSource onLoaded={onLoaded} />}
-        {source === 'upload' && <UploadSource onLoaded={onLoaded} />}
+        {source === 'upload' && <UploadSource onLoaded={onLoaded} form={upload} setForm={setUpload} />}
         {source === 'saved' && <SavedSource onLoaded={onLoaded} current={journey.dataset} />}
       </div>
 
@@ -62,6 +82,7 @@ export default function Data() {
 
 function useLoader(onLoaded) {
   const [state, setState] = useState({ busy: false, error: null });
+  const seconds = useElapsed(state.busy);
   const run = async (fn) => {
     setState({ busy: true, error: null });
     try {
@@ -72,7 +93,7 @@ function useLoader(onLoaded) {
       setState({ busy: false, error });
     }
   };
-  return [state, run];
+  return [{ ...state, seconds }, run];
 }
 
 function Problems({ error }) {
@@ -110,8 +131,9 @@ function SampleSource({ onLoaded }) {
         disabled={state.busy}
         onClick={() => run(() => api.selectDataset('default'))}
       >
-        {state.busy ? 'Loading…' : 'Load dataset'}
+        {state.busy ? `Loading… ${state.seconds} s` : 'Load dataset'}
       </button>
+      {state.busy && state.seconds >= BUSY_UPLOAD_S && <p className={styles.busyText}>{BUSY_TEXT}</p>}
       <Problems error={state.error} />
     </div>
   );
@@ -119,8 +141,19 @@ function SampleSource({ onLoaded }) {
 
 function SavedSource({ onLoaded, current }) {
   const list = useApi((signal) => api.datasets({ signal }), []);
+  const waited = useElapsed(list.loading);
   const [state, run] = useLoader(onLoaded);
   const [choice, setChoice] = useState('');
+  if (list.loading && waited >= BUSY_LIST_S) {
+    return (
+      <div className={styles.busy} role="alert">
+        <p>{BUSY_TEXT}</p>
+        <button type="button" className="btn" onClick={list.reload}>
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (list.loading) return <Loading label="Reading saved datasets" />;
   if (list.error) return <ErrorState error={list.error} onRetry={list.reload} />;
   const uploads = list.data.datasets.filter((d) => d.name !== 'default');
@@ -159,26 +192,43 @@ function SavedSource({ onLoaded, current }) {
         ))}
       </fieldset>
       <button type="submit" className="btn btn-primary" disabled={!choice || state.busy}>
-        {state.busy ? 'Loading…' : 'Load dataset'}
+        {state.busy ? `Loading… ${state.seconds} s` : 'Load dataset'}
       </button>
+      {state.busy && state.seconds >= BUSY_UPLOAD_S && <p className={styles.busyText}>{BUSY_TEXT}</p>}
       <Problems error={state.error} />
     </form>
   );
 }
 
-function UploadSource({ onLoaded }) {
-  const [name, setName] = useState('');
-  const [files, setFiles] = useState({});
+function UploadSource({ onLoaded, form, setForm }) {
   const [state, run] = useLoader(onLoaded);
+  const { name, files } = form;
   const nameOk = /^[a-z0-9-]{1,40}$/.test(name) && name !== 'default';
   const total = Object.values(files).reduce((n, f) => n + f.size, 0);
   const tooBig = total > MAX_BYTES;
-  const ready = nameOk && FILES.every((f) => files[f.key]) && !tooBig;
 
+  // Everything that still stops "Load dataset", in plain words
+  const missing = [];
+  if (!name) missing.push('dataset name (use a–z, 0–9 and -)');
+  else if (name === 'default') missing.push('a dataset name other than “default”');
+  else if (!nameOk) missing.push('a valid dataset name (use a–z, 0–9 and -)');
+  FILES.forEach((f) => {
+    if (!files[f.key]) missing.push(f.file);
+  });
+  if (tooBig) missing.push(`files under 5 MB in total (now ${(total / 1024 / 1024).toFixed(1)} MB)`);
+  const ready = missing.length === 0;
+
+  const setName = (value) => setForm((f) => ({ ...f, name: value, nameEdited: true }));
   const read = (key, file) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setFiles((f) => ({ ...f, [key]: { name: file.name, size: file.size, text: String(reader.result) } }));
+    reader.onload = () =>
+      setForm((f) => {
+        const next = { ...f, files: { ...f.files, [key]: { name: file.name, size: file.size, text: String(reader.result) } } };
+        // Name the dataset after the patients file unless the user typed a name
+        if (key === 'patientsCsv' && !f.nameEdited) next.name = nameFromFile(file.name);
+        return next;
+      });
     reader.readAsText(file);
   };
 
@@ -187,7 +237,7 @@ function UploadSource({ onLoaded }) {
       className={styles.option}
       onSubmit={(e) => {
         e.preventDefault();
-        if (!ready) return;
+        if (!ready || state.busy) return;
         run(() =>
           api.upload({
             name,
@@ -210,7 +260,7 @@ function UploadSource({ onLoaded }) {
           onChange={(e) => setName(e.target.value)}
           aria-invalid={name !== '' && !nameOk}
           aria-describedby="ds-name-hint"
-          placeholder="my-data"
+          placeholder="Filled in from the patients file"
           autoComplete="off"
         />
         <span id="ds-name-hint" className={name !== '' && !nameOk ? styles.bad : 'muted small'}>
@@ -224,14 +274,23 @@ function UploadSource({ onLoaded }) {
         ))}
       </div>
 
-      {tooBig && (
-        <p className={styles.bad} role="alert">
-          The three files add up to {(total / 1024 / 1024).toFixed(1)} MB; the limit is 5 MB.
-        </p>
-      )}
-      <button type="submit" className="btn btn-primary" disabled={!ready || state.busy}>
-        {state.busy ? 'Checking and loading…' : 'Load dataset'}
-      </button>
+      <div className={styles.submitRow}>
+        <button type="submit" className="btn btn-primary" disabled={!ready || state.busy} aria-describedby="upload-status">
+          {state.busy ? 'Checking and loading…' : 'Load dataset'}
+        </button>
+        {state.busy && <span className="muted small">{state.seconds} s</span>}
+      </div>
+      <div id="upload-status" aria-live="polite">
+        {!ready && !state.busy && (
+          <p className={styles.missing}>
+            <strong>Still needed:</strong> {missing.join(' · ')}
+          </p>
+        )}
+        {state.busy && state.seconds >= BUSY_UPLOAD_S && <p className={styles.busyText}>{BUSY_TEXT}</p>}
+      </div>
+      <p className="muted small">
+        Chosen files stay here while you switch tabs, but are lost if you reload the page.
+      </p>
       <Problems error={state.error} />
     </form>
   );

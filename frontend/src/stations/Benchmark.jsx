@@ -81,13 +81,18 @@ export default function Benchmark() {
       </div>
 
       {state.loading && (
-        <div className={styles.loading} role="status">
-          <p className={styles.loadingTitle}>Measuring on {n.toLocaleString('en-US')} patients…</p>
+        <div className={styles.loading}>
+          <p className="vh" role="status">
+            Benchmark running.
+          </p>
+          <p className={styles.loadingTitle} aria-hidden="true">
+            Running… {elapsed} s
+          </p>
           <p className={styles.dim}>
+            Measuring on {n.toLocaleString('en-US')} patients.{' '}
             {n === 20000
-              ? 'The naive decision-tree search alone takes several seconds. This usually needs about 20 seconds.'
-              : 'This takes about a second.'}{' '}
-            {elapsed > 0 && `${elapsed} s so far.`}
+              ? 'The naive decision-tree search alone takes several seconds; this usually needs about 20 seconds. The rest of the app keeps working meanwhile.'
+              : 'This takes about a second.'}
           </p>
         </div>
       )}

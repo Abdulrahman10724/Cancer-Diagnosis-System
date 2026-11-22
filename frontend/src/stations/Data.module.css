@@ -361,3 +361,31 @@ label.choose:has(+ input:focus-visible) {
     display: none;
   }
 }
+
+.submitRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.missing {
+  font-size: var(--t15);
+}
+
+.busyText {
+  color: var(--mid-ink);
+  font-size: var(--t15);
+  font-weight: 600;
+}
+
+.busy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s1);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--mid);
+  border-radius: var(--r);
+  background: var(--mid-tint);
+}

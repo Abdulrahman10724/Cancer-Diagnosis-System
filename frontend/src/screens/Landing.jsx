@@ -1,12 +1,11 @@
 import { useInView } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api/client';
 import CountUp from '../components/CountUp';
 import MetroDiagram from '../components/MetroDiagram';
 import useMedia from '../lib/useMedia';
 import { LINES, CORE, STATIONS } from '../lib/metro';
-import { proofFrom, PROOF_FALLBACK, readCachedBenchmark, cacheBenchmark } from '../lib/benchmark';
+import { proofFrom, PROOF_FALLBACK, readCachedBenchmark } from '../lib/benchmark';
 import styles from './Landing.module.css';
 
 const WHERE = {
@@ -22,24 +21,12 @@ export default function Landing() {
   const vertical = useMedia('(max-width: 720px)');
   const proofRef = useRef(null);
   const proofSeen = useInView(proofRef, { once: true, margin: '0px 0px -20% 0px' });
-  const [proof, setProof] = useState(() => {
+  // No request here: a 20,000-patient benchmark takes many seconds, so it only runs on the
+  // Benchmark station. Show that result if this browser session has one, else docs/DSA.md.
+  const [proof] = useState(() => {
     const cached = readCachedBenchmark(20000);
     return cached ? { ...proofFrom(cached), live: true } : { ...PROOF_FALLBACK, live: false };
   });
-
-  // Measure on the server once the proof section is in view (falls back to docs/DSA.md quietly)
-  useEffect(() => {
-    if (!proofSeen || proof.live) return undefined;
-    const controller = new AbortController();
-    api
-      .benchmark(20000, 1, { signal: controller.signal })
-      .then((data) => {
-        cacheBenchmark(20000, data);
-        setProof({ ...proofFrom(data), live: true });
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [proofSeen, proof.live]);
 
   const scrollToProof = (e) => {
     e.preventDefault();
@@ -138,7 +125,7 @@ export default function Landing() {
             Does it matter?
           </h2>
           <p className={styles.sectionLede}>
-            {proof.live ? 'Measured just now on this server, ' : 'Measured on 20,000 patients, '}
+            {proof.live ? 'Measured on this server on 20,000 patients, ' : 'Measured on 20,000 patients, '}
             the same job done the simple way and with our structure.
           </p>
           <dl className={styles.numbers}>
