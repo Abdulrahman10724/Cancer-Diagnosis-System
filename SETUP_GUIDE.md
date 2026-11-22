@@ -15,8 +15,9 @@ Before you begin, ensure you have the following installed:
   - **Linux**: GCC (install via `sudo apt-get install build-essential`)
   - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
 
-- **Python 3** (for serving the UI - optional, you can also open HTML directly)
-  - Verify: `python --version` or `python3 --version`
+- **Node.js 18 or newer** (for the React frontend; npm comes with it)
+  - Download: https://nodejs.org/
+  - Verify: `node --version` and `npm --version`
 
 ## 🚀 Quick Start
 
@@ -103,69 +104,63 @@ Starting server on http://localhost:8080 ...
 
 **Keep this terminal window open!** The server must remain running to use the application.
 
-### Step 4: Open the Web Interface
+### Step 4: Start the Web Interface
 
-You have two options:
-
-#### Option A: Using Python HTTP Server (Recommended)
-
-Open a **new terminal window** and run:
+Open a **new terminal window** in the project root and run:
 
 ```bash
-cd CancerDiagnosisSystem/ui
-python -m http.server 8000
-# Or on some systems:
-python3 -m http.server 8000
+cd frontend
+npm install
+npm run dev
 ```
 
-Then open your browser and navigate to:
+`npm install` is only needed the first time. Vite prints a local address, normally:
 ```
-http://localhost:8000/index.html
+http://localhost:5173
 ```
 
-#### Option B: Open HTML File Directly
+Open it in your browser. The frontend connects to `http://localhost:8080` by default.
 
-Simply double-click `ui/index.html` or open it directly in your browser. Note: Some browsers may have CORS restrictions when opening files directly.
+Other frontend scripts:
+- `npm run build`: production build in `frontend/dist/`
+- `npm run lint`: ESLint
 
 ### Step 5: Load Data
 
-1. In the web interface, navigate to the **"Load Data"** section
-2. Click the **"Load Data on Server"** button
-3. Wait 3-5 seconds for the data to load
-4. You should see a success message
-5. Check the **Dashboard** section to verify data was loaded
+1. The app opens on **Setup**. It shows whether the server is reachable.
+2. Choose **Load data**. The server reads `data/genes.csv`, `data/patients.csv` and
+   `data/patient_genes.csv` and trains the four models.
+3. The status shows **Trained** with the number of genes and patients, and the lab
+   notebook on the right records the event.
+4. Continue with **Accession** (add a patient) or **Gel** (run the models).
 
 ## 📂 Project Structure
 
 ```
-CancerDiagnosisSystem/
+Cancer-Diagnosis-System/
 ├── data/                      # Data files (CSV format)
 │   ├── genes.csv             # Genetic mutation data
 │   ├── patients.csv          # Patient information
 │   ├── patient_genes.csv     # Which genes belong to which patient
 │   ├── test_genes.csv        # Test dataset
 │   └── test_patients.csv     # Test dataset
-├── headers/                   # C++ header files
-│   ├── CancerDiagnosisSystem.h
-│   ├── DecisionTreeClassifier.h
-│   ├── KNNClassifier.h
-│   ├── LogisticRegressionModel.h
-│   ├── NaiveBayesClassifier.h
-│   └── ...
+├── headers/                   # C++ header files (models, data structures, system)
 ├── src/                       # C++ source files
 │   ├── Server.cpp            # HTTP server implementation
 │   ├── CancerDiagnosisSystem.cpp
+│   ├── HashMapper.cpp        # Separate-chaining hash table
 │   └── ...
-├── ui/                        # Web interface
-│   ├── index.html            # Main HTML file
-│   ├── script.js             # Frontend JavaScript
-│   └── styles.css            # Styling
-├── third_party/               # Third-party libraries
+├── frontend/                  # React web interface (Vite)
+│   ├── package.json
+│   └── src/
+│       ├── api/client.js     # All calls to the server
+│       ├── screens/          # Setup, Accession, Rack, Gel, Report, Proficiency, Custody, Freezer
+│       ├── components/       # Shared components
+│       └── styles/tokens.css # Design tokens (colors, type, spacing)
+├── third_party/
 │   └── httplib.h             # HTTP server library
-├── build/                     # Build directory (created by CMake)
-│   └── Release/              # Compiled executable
-│       └── cds_server.exe    # Server executable (Windows)
-│       └── cds_server        # Server executable (Linux/macOS)
+├── docs/screenshots/          # Screenshots used in the README
+├── build/                     # Build directory (created by CMake, not committed)
 ├── CMakeLists.txt            # CMake configuration
 └── SETUP_GUIDE.md           # This file
 ```
@@ -183,17 +178,20 @@ svr.listen("localhost", 8080);
 
 Change `8080` to your desired port (e.g., `8081`), then rebuild the project.
 
-### Changing the API Endpoint in UI
+### Changing the API Endpoint in the Frontend
 
-If you changed the server port, update the UI configuration:
+If you changed the server port, either:
 
-1. Open `ui/index.html` or use the Settings section in the web interface
-2. Update the `apiEndpoint` in `script.js` (line 7) or use the Settings UI
-3. Refresh the browser
+1. Open **Setup** in the web interface, enter the new address under **Server address**
+   and choose **Save and reconnect** (saved in this browser only), or
+2. Start the frontend with the address set:
+   ```bash
+   VITE_API_URL=http://localhost:8081 npm run dev
+   ```
 
 ## 🐛 Troubleshooting
 
-### Problem: "Server load failed" or "Failed to fetch"
+### Problem: "Server not reachable at localhost:8080"
 
 **Cause:** Server is not running or not accessible.
 
@@ -201,6 +199,16 @@ If you changed the server port, update the UI configuration:
 1. Check if the server terminal shows: `Starting server on http://localhost:8080 ...`
 2. If not, restart the server from the project root directory
 3. Verify the server is accessible by opening: http://localhost:8080/status in your browser
+4. The app checks again every few seconds and reconnects by itself once the server is up
+
+### Problem: `npm install` or `npm run dev` fails
+
+**Cause:** Node.js is missing or too old.
+
+**Solution:**
+1. Check `node --version` shows 18 or newer
+2. Run the commands inside the `frontend/` folder
+3. Delete `frontend/node_modules` and run `npm install` again
 
 ### Problem: "Error: Could not open file data/genes.csv"
 
@@ -212,7 +220,7 @@ If you changed the server port, update the UI configuration:
 
 ```bash
 # Make sure you're in the project root
-cd CancerDiagnosisSystem
+cd Cancer-Diagnosis-System
 ./build/Release/cds_server.exe  # Windows
 # or
 ./build/cds_server              # Linux/macOS
@@ -304,11 +312,21 @@ P001,GENE_002
 - Written automatically by the server whenever data is saved
 - If the file is missing, each patient gets 5 consecutive genes from `genes.csv` (fallback)
 
-### API: Model Evaluation
+### API: New Endpoints
 
-`GET http://localhost:8080/evaluate` returns accuracy, precision, recall and F1 for all 4 models,
-measured on a held-out 20% of the genetic data (stratified, fixed seed). Load data first,
-otherwise the server returns HTTP 400 `{"error":"Load data first"}`.
+Load data first; otherwise model endpoints return HTTP 400 `{"error":"Load data first"}`.
+The full reference is in the [README](README.md#-api-documentation).
+
+- `GET /diagnose?patient_id=P007&model=all&k=5`: all four models in one response, with the
+  numbers behind each prediction. `k` (odd, 1–15) sets the KNN K for this request only.
+- `GET /evaluate`: accuracy, precision, recall and F1 for all 4 models on a held-out 20% of
+  the genetic data (stratified, fixed seed), plus a confusion matrix and the predicted risk
+  for every test sample.
+- `GET /hashmap`: the buckets of the mutation hash table. `HashMapper` is a separate-chaining
+  hash table implemented in this project (rolling hash `h = h * 31 + c`, doubles its buckets
+  when the load factor passes 0.75).
+- `GET /patients/search?id=P007`: linear search of the patient linked list, with the IDs
+  visited in order.
 
 ## 🧪 Testing the Setup
 
@@ -324,34 +342,25 @@ You should see JSON response:
 {"modelsTrained":false,"geneticCount":0,"patientCount":0}
 ```
 
-### Test 2: Load Data via Browser Console
+### Test 2: Load Data and Diagnose with curl
 
-1. Open the web interface
-2. Press `F12` to open browser console
-3. Run this command:
-
-```javascript
-fetch('http://localhost:8080/load', {
-  method: 'POST',
-  headers: {'Content-Type': 'application/json'},
-  body: JSON.stringify({
-    genesFile: 'data/genes.csv',
-    patientsFile: 'data/patients.csv'
-  })
-})
-.then(r => r.json())
-.then(d => console.log('✓ Data loaded:', d))
-.catch(e => console.error('✗ Load failed:', e));
+```bash
+curl -X POST http://localhost:8080/load -d '{"genesFile":"data/genes.csv","patientsFile":"data/patients.csv"}'
 ```
 
-If successful, you'll see a success message in the console.
+```bash
+curl "http://localhost:8080/diagnose?patient_id=P007&model=all"
+```
+
+The first command returns `"modelsTrained":true`; the second returns all four models for
+patient P007.
 
 ## 🎯 Key Points to Remember
 
 - ✅ Always run the server from the **project root directory**
 - ✅ Keep the server terminal window open while using the application
 - ✅ Server runs on `http://localhost:8080` by default
-- ✅ UI can be accessed via Python server on port 8000 or opened directly
+- ✅ The frontend runs with `npm run dev` in `frontend/` (normally on port 5173)
 - ✅ Data files must be in `data/` folder with correct CSV format
 - ✅ Check browser console (F12) for detailed error messages
 
@@ -366,10 +375,10 @@ If successful, you'll see a success message in the console.
 This system includes:
 
 - **Multiple ML Models**: Decision Tree, KNN, Logistic Regression, Naive Bayes
-- **Real-time Diagnosis**: Web-based interface for instant results
-- **Model Evaluation**: Compare performance metrics across models
-- **Data Visualization**: Charts and graphs for analysis
-- **Queue System**: Batch processing for multiple patients
+- **Gel**: all four models side by side, with an explanation for every prediction
+- **Model Evaluation**: metrics on held-out data, with an adjustable threshold
+- **Queue System**: the test rack, processed first in, first out
+- **Data Structures**: the linked list (Custody) and hash table (Freezer) shown step by step
 
 ## 📞 Need Help?
 

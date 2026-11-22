@@ -1,382 +1,365 @@
 # 🔬 Cancer Diagnosis System
 
-> **An AI-powered web application for cancer diagnosis using multiple machine learning algorithms, built from scratch in C++ with a modern web interface.**
+> **Cancer risk from genetic mutation scores with four machine learning models written from scratch in C++, and a React interface designed as a pathology lab bench.**
 
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://en.cppreference.com/)
 [![CMake](https://img.shields.io/badge/CMake-3.10+-green.svg)](https://cmake.org/)
+[![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> **Educational project — not for clinical use.**
+
+![The gel: each lane is one model; a band sinks further the higher that model puts the cancer risk](docs/screenshots/gel.png)
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [API Documentation](#api-documentation)
-- [Machine Learning Models](#machine-learning-models)
-- [Screenshots](#screenshots)
-- [Contributing](#contributing)
-- [License](#license)
-- [Author](#author)
+- [Overview](#-overview)
+- [Features](#-features)
+- [Design: the Pathology Bench](#-design-the-pathology-bench)
+- [Tech Stack](#️-tech-stack)
+- [Getting Started](#-getting-started)
+- [Usage](#-usage)
+- [Project Structure](#-project-structure)
+- [API Documentation](#-api-documentation)
+- [Machine Learning Models](#-machine-learning-models)
+- [Data Structures](#-data-structures)
+- [Data Format](#-data-format)
+- [Screenshots](#-screenshots)
+- [License](#-license)
+- [Author](#-author)
 
 ## 🎯 Overview
 
-The **Cancer Diagnosis System** is a comprehensive, full-stack application that leverages multiple machine learning algorithms to assist in cancer diagnosis based on genetic mutation data. This project demonstrates the implementation of core ML algorithms from scratch in C++, combined with a modern web-based user interface for real-time diagnosis and analysis.
+The **Cancer Diagnosis System** predicts whether a patient's genes point to cancer. Each
+patient has a few genes with a mutation score from 0 to 1. The models look at the
+patient's mean mutation score and return a risk between 0 and 1.
+
+The project has two parts:
+
+- A **C++17 HTTP server** (`cds_server`, port 8080) with four models implemented from
+  scratch and the data structures the course asks for, each used for a real job.
+- A **React frontend** (`frontend/`) that shows every result and explains how each model
+  reached it.
 
 ### Key Highlights
 
-- 🧠 **Four ML Models**: Decision Tree, K-Nearest Neighbors, Logistic Regression, and Naive Bayes
-- ⚡ **High Performance**: C++ backend ensures fast processing and low latency
-- 🌐 **Modern Web UI**: Intuitive interface with real-time data visualization
-- 📊 **Model Comparison**: Evaluate and compare multiple ML models side-by-side
-- 🔄 **Batch Processing**: Queue system for processing multiple patients efficiently
-- 📈 **Comprehensive Metrics**: Accuracy, Precision, Recall, and F1-Score evaluation
+- 🧠 **Four models from scratch**: Logistic Regression, K-Nearest Neighbors, Decision Tree and Naive Bayes
+- 🧪 **Explained predictions**: for every model you can see the numbers behind its answer
+- 📊 **Honest evaluation**: metrics on a held-out 20% split the evaluated models never trained on
+- 🧱 **Data structures you can see**: queue as a tube rack, linked list as a chain of custody, hash table as a freezer index
 
 ## ✨ Features
 
-### Core Functionality
+- **Gel**: run up to three patients through all four models at once; disagreement and uncertainty are visible at a glance
+- **Why drawer**: KNN neighbours, the decision-tree path, the logistic-regression formula and the Naive Bayes bell curves, all with real numbers
+- **KNN K control**: change K (1–9) for one request and watch the KNN band move
+- **Accession**: add a patient with genetic records; the models retrain with the new genes
+- **Rack**: the test queue (FIFO), processed tube by tube
+- **Report**: a printable one-page report per patient with all four verdicts and a "models disagree" flag
+- **Proficiency**: one 96-well plate per model, and a threshold dial that recomputes accuracy, precision, recall and F1
+- **Custody**: linear search through the patient linked list, node by node
+- **Freezer**: the hash table's buckets and a step-by-step trace of where a gene ID is stored
+- **Lab notebook**: a log of real events with times, exportable as `.txt`
 
-- **Multi-Model Diagnosis**: Run predictions using four different ML algorithms
-- **Real-time Analysis**: Instant diagnosis results with confidence scores
-- **Data Management**: Load and manage patient and genetic data via CSV files
-- **Batch Queue System**: Process multiple patients in a queue for efficient workflow
-- **Model Evaluation**: Comprehensive performance metrics for all models
-- **Data Visualization**: Interactive charts and graphs using Chart.js
-- **Responsive Design**: Modern, user-friendly interface with dark mode support
+## 🧫 Design: the Pathology Bench
 
-### Advanced Features
+The interface looks and behaves like a genetics lab bench. Every screen is a lab tool, and
+the program's data structures appear as lab objects:
 
-- **Hash-based Data Mapping**: Efficient genetic data lookup using custom hash tables
-- **Data Preprocessing**: Automated data cleaning and normalization
-- **RESTful API**: Clean API design for easy integration
-- **CORS Support**: Cross-origin resource sharing enabled for web access
-- **Error Handling**: Robust error handling and user feedback
-- **Settings Management**: Configurable API endpoints and preferences
+| Program | Lab object | Screen |
+|---|---|---|
+| Model predictions | Gel electrophoresis | Gel |
+| Test queue (FIFO) | Tube rack and analyzer | Rack |
+| Patient history (linked list) | Chain of custody | Custody |
+| Mutation map (hash table) | Freezer box index | Freezer |
+| Evaluation on held-out data | Proficiency test plates | Proficiency |
+
+**The gel is the one bold element.** Its vertical axis is risk: 0 (safe) at the top, 1
+(cancer) at the bottom, with a dashed threshold line at 0.5. A sharp band means the model
+is confident; a smeared band means it is unsure (band height and blur grow as the risk
+gets closer to 0.5). When a gel runs, the bands migrate from the wells to their position;
+with reduced motion turned on they simply appear in place.
+
+**Stain colors identify models only**, named after real histology stains:
+
+| Model | Stain | Light surfaces | On the gel |
+|---|---|---|---|
+| Logistic Regression | Hematoxylin | `#6A3FA0` | `#A47BE1` |
+| KNN | DAB amber | `#C98A00` | `#C48600` |
+| Decision Tree | Eosin | `#D0457E` | `#E75A91` |
+| Naive Bayes | Methylene blue | `#0089B0` | `#31A1C9` |
+
+Outcomes have their own colors (`#2E7D5B` non-cancerous, `#B3261E` cancerous) and always
+come with a word and an icon. The gel colors are lighter steps of the same hues, checked
+for color-blind separation and 3:1 contrast on the dark gel surface. Every lane, plate and
+legend also prints the model name as text, so no information depends on color alone.
+All values are in [`frontend/src/styles/tokens.css`](frontend/src/styles/tokens.css).
+
+Type is Atkinson Hyperlegible Next throughout (a typeface designed for legibility), with
+Libre Barcode 128 only on specimen labels, which carry a valid Code 128 barcode of the
+patient ID.
 
 ## 🛠️ Tech Stack
 
 ### Backend
 - **Language**: C++17
-- **HTTP Server**: [cpp-httplib](https://github.com/yhirose/cpp-httplib) v0.28.0
-- **Build System**: CMake 3.10+
-- **Architecture**: RESTful API
+- **HTTP server**: [cpp-httplib](https://github.com/yhirose/cpp-httplib) v0.28.0 (single header in `third_party/`)
+- **Build**: CMake 3.10+
+- Thread-safe: every request handler locks one mutex around the shared system object
 
 ### Frontend
-- **HTML5**: Semantic markup
-- **CSS3**: Modern styling with animations
-- **JavaScript**: Vanilla JS (no frameworks)
-- **Chart.js**: Data visualization library
-
-### Machine Learning
-- **Algorithms**: Implemented from scratch
-  - Decision Tree Classifier
-  - K-Nearest Neighbors (KNN)
-  - Logistic Regression
-  - Naive Bayes Classifier
-
-### Data Structures
-- **Hash Tables**: Custom implementation for genetic data mapping
-- **Vectors & Arrays**: Efficient data storage and manipulation
-- **Queues**: Patient processing queue system
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐
-│   Web Browser   │
-│   (Frontend)    │
-└────────┬────────┘
-         │ HTTP/REST API
-         │ (JSON)
-┌────────▼────────┐
-│  C++ HTTP Server │
-│   (Port 8080)    │
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    │         │
-┌───▼───┐ ┌──▼────────┐
-│  ML   │ │  Data     │
-│ Models│ │ Structures│
-└───────┘ └───────────┘
-```
-
-### System Flow
-
-1. **Data Loading**: CSV files are loaded and preprocessed
-2. **Model Training**: ML models are trained on genetic mutation data
-3. **Diagnosis**: Patient genetic data is analyzed by selected model(s)
-4. **Results**: Predictions are returned with confidence scores
-5. **Visualization**: Results are displayed in the web interface
+- **React 18** with **Vite**, React Router
+- **framer-motion** (gel migration, drawer), **@dnd-kit/core** (drag samples onto the gel), **d3-scale** (scales only; every chart is hand-drawn SVG)
+- CSS Modules and one `tokens.css`; fonts from `@fontsource`
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- **CMake** (3.10 or higher)
-- **C++ Compiler**:
-  - Windows: Visual Studio 2019+
-  - Linux: GCC
-  - macOS: Xcode Command Line Tools
-- **Python 3** (optional, for serving UI)
+- **CMake** 3.10 or higher
+- **C++17 compiler**: Visual Studio 2019+ or MinGW (Windows), GCC (Linux), Xcode Command Line Tools (macOS)
+- **Node.js 18** or newer (for the frontend)
 
-### Installation
+### 1. Clone
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Abdulrahman10724/Cancer-Diagnosis-System.git
-   cd Cancer-Diagnosis-System
-   ```
+```bash
+git clone https://github.com/Abdulrahman10724/Cancer-Diagnosis-System.git
+```
 
-2. **Build the project**
-   ```bash
-   # Create build directory
-   mkdir build && cd build
-   
-   # Configure (Windows)
-   cmake .. -G "Visual Studio 16 2019"
-   
-   # Configure (Linux/macOS)
-   cmake .. -DCMAKE_BUILD_TYPE=Release
-   
-   # Build
-   cmake --build . --config Release
-   ```
+```bash
+cd Cancer-Diagnosis-System
+```
 
-   **Windows with MinGW (MSYS2):**
-   ```bash
-   mkdir build && cd build
-   cmake .. -G "MinGW Makefiles"
-   cmake --build .
-   # Executable: build\cds_server.exe
-   ```
+### 2. Build the server
 
-3. **Run the server**
-   ```bash
-   # From project root directory
-   ./build/Release/cds_server.exe  # Windows (Visual Studio)
-   .\build\cds_server.exe          # Windows (MinGW)
-   ./build/cds_server               # Linux/macOS
-   ```
+**Linux / macOS**
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build .
+```
 
-4. **Open the web interface**
-   ```bash
-   cd ui
-   python -m http.server 8000
-   # Open http://localhost:8000/index.html in your browser
-   ```
+**Windows (Visual Studio)**
+```bash
+mkdir build && cd build
+cmake .. -G "Visual Studio 16 2019"
+cmake --build . --config Release
+```
 
-For detailed setup instructions, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
+**Windows with MinGW (MSYS2)**
+```bash
+mkdir build && cd build
+cmake .. -G "MinGW Makefiles"
+cmake --build .
+# Executable: build\cds_server.exe
+```
+
+### 3. Run the server
+
+Always run it from the project root, so it finds the `data/` folder:
+
+```bash
+./build/cds_server               # Linux/macOS
+.\build\Release\cds_server.exe   # Windows (Visual Studio)
+.\build\cds_server.exe           # Windows (MinGW)
+```
+
+### 4. Run the frontend
+
+In a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open the URL Vite prints (normally http://localhost:5173). On the **Setup** screen, choose
+**Load data**. The server reads the CSV files and trains the four models.
+
+The frontend talks to `http://localhost:8080` by default. To use another address, change
+it on the Setup screen, or set `VITE_API_URL` before `npm run dev`.
+
+Other scripts: `npm run build` (production build in `frontend/dist/`) and `npm run lint`.
+
+For more detail and troubleshooting, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 
 ## 📖 Usage
 
-### Loading Data
-
-1. Navigate to the **"Load Data"** section
-2. Click **"Load Data on Server"**
-3. Wait for confirmation message
-4. Verify data in the Dashboard
-
-### Running Diagnosis
-
-1. Go to **"Run Diagnosis"** section
-2. Add patient genetic records (Gene ID and Mutation Score)
-3. Select one or more ML models
-4. Click **"Run Diagnosis"**
-5. View results with confidence scores
-
-### Evaluating Models
-
-1. Navigate to **"Evaluate Models"** section
-2. Click **"Evaluate All Models"**
-3. Compare performance metrics:
-   - Accuracy
-   - Precision
-   - Recall
-   - F1-Score
-
-### Queue System
-
-1. Add patients to the queue
-2. Process queue to run batch diagnosis
-3. View results for all queued patients
+1. **Setup**: load the data (trains the models).
+2. **Accession**: add a patient with their genes. The models retrain.
+3. **Gel**: drag specimen labels onto the wells (or select one and press Enter), then
+   **Run gel**. Select a band to see why the model placed it there.
+4. **Rack**: add tubes, pick a model and **Process rack**.
+5. **Report**: open the one-page report and **Print report**.
+6. **Proficiency**, **Custody** and **Freezer**: see how accurate each model is and how the
+   data structures work.
 
 ## 📁 Project Structure
 
 ```
-CancerDiagnosisSystem/
-├── data/                      # CSV data files
-│   ├── genes.csv             # Genetic mutation data
-│   ├── patients.csv          # Patient information
-│   ├── patient_genes.csv     # Which genes belong to which patient
-│   └── test_*.csv            # Test datasets
-├── headers/                   # C++ header files
-│   ├── CancerDiagnosisSystem.h
-│   ├── DecisionTreeClassifier.h
-│   ├── KNNClassifier.h
-│   ├── LogisticRegressionModel.h
-│   ├── NaiveBayesClassifier.h
-│   └── ...
-├── src/                       # C++ source files
-│   ├── Server.cpp            # HTTP server implementation
-│   ├── CancerDiagnosisSystem.cpp
-│   └── [ML Model implementations]
-├── ui/                        # Web interface
-│   ├── index.html            # Main HTML file
-│   ├── script.js             # Frontend logic
-│   └── styles.css            # Styling
-├── third_party/               # External libraries
-│   └── httplib.h             # HTTP server library
-├── CMakeLists.txt            # Build configuration
-├── SETUP_GUIDE.md            # Detailed setup guide
-└── README.md                 # This file
+Cancer-Diagnosis-System/
+├── data/
+│   ├── genes.csv              # Genetic records: Gene_ID, Mutation_Score, Label
+│   ├── patients.csv           # Patients: Patient_ID, Name, Age
+│   ├── patient_genes.csv      # Which genes belong to which patient
+│   └── test_*.csv             # Extra test datasets
+├── headers/                   # C++ headers (models, data structures, system)
+├── src/                       # C++ sources; Server.cpp is the HTTP API
+├── third_party/httplib.h      # cpp-httplib
+├── frontend/                  # React app
+│   └── src/
+│       ├── api/client.js      # The only place that calls the server
+│       ├── state/AppState.jsx # App state (Context + useReducer)
+│       ├── styles/            # tokens.css, global.css
+│       ├── components/        # SpecimenLabel, Band, Lane, Well, Plate, Tube, Drawer, …
+│       ├── screens/           # Setup, Accession, Rack, Gel, Report, Proficiency, Custody, Freezer
+│       └── lib/               # metrics.js, format.js, models.js, code128.js, hash.js
+├── docs/screenshots/
+├── generate_genes.py          # Generates a realistic genes.csv
+├── main.cpp                   # Optional command-line version
+├── CMakeLists.txt
+├── SETUP_GUIDE.md
+└── README.md
 ```
 
 ## 🔌 API Documentation
 
-### Endpoints
+The server listens on `http://localhost:8080`. Every response carries
+`Access-Control-Allow-Origin: *`. Errors are JSON: `{"error":"..."}`, with `400` for bad
+input or when no data is loaded (`{"error":"Load data first"}`), `404` for unknown IDs and
+`409` for a duplicate patient ID.
 
-#### `GET /status`
-Get system status and data counts.
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/status` | `modelsTrained`, `geneticCount`, `patientCount` |
+| POST | `/load` | Load CSV files and train. Body: `{"genesFile":"data/genes.csv","patientsFile":"data/patients.csv"}` (optional `patientGenesFile`) |
+| GET | `/patients` | Patients in linked-list order (head first), with `riskScore`, `prediction` and their `genes` |
+| POST | `/patients` | Add a patient: `{"patient_id","name","age","geneticRecords":[{"geneId","mutationScore","label"}]}`. Retrains, saves the CSV files |
+| GET | `/patients/search?id=ID` | Linear search of the linked list |
+| GET | `/genetic` | All genetic records |
+| GET | `/diagnose?patient_id=ID&model=M&k=K` | Diagnose one patient |
+| GET | `/evaluate` | Metrics on a held-out 20% split, with per-sample data |
+| GET | `/hashmap` | Buckets of the mutation hash table |
+| GET | `/queue` | Queued patient IDs, front first |
+| POST | `/queue` | Add a patient to the rear: `{"patient_id":"P001"}` |
+| POST | `/queue/process` | Process the whole queue: `{"model":"logistic"}` |
 
-**Response:**
+### `GET /diagnose`
+
+`model` is `logistic`, `knn`, `decision_tree`, `naive_bayes` (single model, returns
+`{"patient_id","riskScore","prediction"}`) or `all`. `k` is optional (odd, 1–15, default 5)
+and changes K for KNN for this request only.
+
+`model=all` returns all four models with the numbers behind each answer:
+
 ```json
 {
-  "modelsTrained": true,
-  "geneticCount": 150,
-  "patientCount": 50
+  "patient_id": "P007",
+  "featureRaw": 0.52578,
+  "featureScaled": 0.179608,
+  "scale": { "mean": 0.487289, "std": 0.214304 },
+  "geneCount": 5,
+  "threshold": 0.5,
+  "models": {
+    "logistic": { "risk": 0.529, "prediction": 1, "explain": { "weight": 0.9475, "bias": -0.0531, "z": 0.117 } },
+    "knn": { "risk": 0.6, "prediction": 1, "k": 5,
+             "explain": { "neighbors": [ { "gene_id": "GENE_076", "mutation_score": 0.5215, "label": 0, "distance": 0.02 } ],
+                          "votesCancer": 3, "votesSafe": 2 } },
+    "decision_tree": { "risk": 0.0, "prediction": 0,
+                       "explain": { "path": [ { "threshold": 0.527, "thresholdScaled": 0.1855, "wentLeft": true, "positiveFraction": 0.485, "samples": 206 } ],
+                                    "leafPositiveFraction": 0.0, "leafSamples": 3 } },
+    "naive_bayes": { "risk": 0.514, "prediction": 1,
+                     "explain": { "safe": { "mean": -0.46, "std": 0.83, "prior": 0.51 },
+                                  "cancer": { "mean": 0.49, "std": 0.94, "prior": 0.49 } } }
+  },
+  "consensus": { "cancer": 3, "safe": 1 }
 }
 ```
 
-#### `POST /load`
-Load data from CSV files.
+`featureRaw` is the patient's mean mutation score (what the models see), `featureScaled`
+the same value after standardization. KNN neighbour `mutation_score` values are raw;
+`distance` is measured in the scaled space the model uses. Decision-tree `threshold` is on
+the raw score scale and `thresholdScaled` is the value the tree actually compares.
 
-**Request:**
+### `GET /evaluate`
+
+The genetic data is split 80% train / 20% test, stratified by label, with a fixed seed.
+Temporary copies of the models train on the 80% and are measured on the 20%; the models
+used by `/diagnose` stay trained on all the data. Predictions use `risk >= 0.5`.
+
 ```json
 {
-  "genesFile": "data/genes.csv",
-  "patientsFile": "data/patients.csv"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Data loaded successfully",
-  "geneticCount": 150,
-  "patientCount": 50
-}
-```
-
-#### `POST /train`
-Train all ML models.
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Models trained successfully"
-}
-```
-
-#### `POST /diagnose`
-Run diagnosis on patient data.
-
-**Request:**
-```json
-{
-  "model": "decision_tree",
-  "geneticRecords": [
-    {"geneId": "GENE_001", "mutationScore": 0.85},
-    {"geneId": "GENE_002", "mutationScore": 0.72}
-  ]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "model": "decision_tree",
-  "prediction": 1,
-  "confidence": 0.87,
-  "message": "High risk detected"
-}
-```
-
-#### `GET /evaluate`
-Evaluate all 4 models on held-out data. The loaded genetic data is split into
-80% train / 20% test (stratified by label, fixed random seed, so results are
-reproducible). Temporary copies of the models are trained on the 80% and the
-metrics are computed on the 20% they did not see. The models used by
-`/diagnose` stay trained on the full data.
-
-**Response:**
-```json
-{
-  "testSamples": 6,
+  "testSamples": 41,
   "models": [
-    {"key":"logistic","name":"Logistic Regression","accuracy":1.0,"precision":1.0,"recall":1.0,"f1":1.0},
-    {"key":"knn","name":"K-Nearest Neighbors","accuracy":1.0,"precision":1.0,"recall":1.0,"f1":1.0},
-    {"key":"decision_tree","name":"Decision Tree","accuracy":1.0,"precision":1.0,"recall":1.0,"f1":1.0},
-    {"key":"naive_bayes","name":"Naive Bayes","accuracy":0.8333,"precision":1.0,"recall":0.6667,"f1":0.8}
+    { "key": "logistic", "name": "Logistic Regression",
+      "accuracy": 0.7561, "precision": 0.8125, "recall": 0.65, "f1": 0.7222,
+      "confusion": { "tp": 13, "fp": 3, "tn": 18, "fn": 7 },
+      "samples": [ { "gene_id": "GENE_001", "mutation_score": 0.3633, "label": 0, "risk": 0.3503 } ] }
   ]
 }
 ```
 
-If no data is loaded: HTTP 400 `{"error":"Load data first"}`.
+The frontend recomputes the metrics for other thresholds from `samples`.
+
+### `GET /hashmap`
+
+```json
+{ "bucketCount": 512, "size": 206, "loadFactor": 0.4023,
+  "buckets": [ { "index": 0, "items": [] },
+               { "index": 7, "items": [ { "key": "GENE_001", "value": 0.3633, "hash": 2016933030407 },
+                                         { "key": "GENE_122", "value": 0.4271, "hash": 2016933031431 } ] } ] }
+```
+
+Hash values above 2^53 lose precision as JSON numbers in JavaScript; the frontend
+recomputes the exact hash with `BigInt` (`frontend/src/lib/hash.js`).
+
+### `GET /patients/search?id=ID`
+
+```json
+{ "found": true, "hops": 9, "order": ["P013","P012","P011","P002","P001","P010","P009","P008","P007"] }
+```
+
+`order` lists every node visited from the head, in order.
 
 ## 🤖 Machine Learning Models
 
-### Decision Tree Classifier
-- **Type**: Supervised Learning
-- **Use Case**: Classification based on feature thresholds
-- **Advantages**: Interpretable, handles non-linear relationships
-- **Implementation**: Custom C++ implementation with recursive splitting
+All four use one feature: the patient's mean mutation score, standardized with the mean
+and standard deviation of the training genes.
 
-### K-Nearest Neighbors (KNN)
-- **Type**: Instance-based Learning
-- **Use Case**: Classification based on similarity
-- **Advantages**: Simple, effective for non-linear data
-- **Implementation**: Distance-based classification with configurable k
+- **Logistic Regression**: gradient descent on log loss (learning rate 0.01, 1000 iterations); risk = σ(w·x + b).
+- **K-Nearest Neighbors**: Euclidean distance; risk = share of the K nearest training genes labelled cancerous (K = 5 by default).
+- **Decision Tree**: Gini impurity, maximum depth 10; risk = share of cancerous training genes in the leaf the patient reaches.
+- **Naive Bayes**: one Gaussian per class plus the class prior; risk = posterior probability of the cancerous class.
 
-### Logistic Regression
-- **Type**: Statistical Learning
-- **Use Case**: Binary classification with probability estimates
-- **Advantages**: Fast, interpretable coefficients
-- **Implementation**: Gradient descent optimization
+## 🧱 Data Structures
 
-### Naive Bayes
-- **Type**: Probabilistic Classifier
-- **Use Case**: Classification based on Bayes' theorem
-- **Advantages**: Fast, works well with small datasets
-- **Implementation**: Gaussian Naive Bayes for continuous features
+- **Linked list** (`PatientNode`): patient history. Searching walks the list from the head, O(n).
+- **Queue** (`std::queue<Patient>`): test requests, first in, first out.
+- **Hash table** (`HashMapper`): gene ID → mutation score. A separate-chaining hash table
+  implemented in this project: a vector of buckets, each a linked list of (key, value)
+  pairs; polynomial rolling hash `h = h * 31 + c` (unsigned 64-bit) modulo the bucket
+  count; starts with 16 buckets and doubles when the load factor passes 0.75.
+- **Vector**: the genetic records used for training.
 
 ## 📊 Data Format
 
 ### genes.csv
 ```csv
 Gene_ID,Mutation_Score,Label
-GENE_001,0.85,1
-GENE_002,0.72,1
-GENE_003,0.45,0
+GENE_001,0.3633,0
+GENE_003,0.7553,1
 ```
 
 ### patients.csv
 ```csv
 Patient_ID,Name,Age
 P001,John Doe,45
-P002,Jane Smith,52
 ```
 
 ### patient_genes.csv
-Links each patient to its own genes (by `Gene_ID` from `genes.csv`). It is written
-automatically whenever the server saves data. If the file does not exist, each
-patient is given 5 consecutive genes from `genes.csv` as a fallback.
+Links each patient to its own genes by `Gene_ID`. The server writes it whenever it saves.
+If the file does not exist, each patient is given 5 consecutive genes from `genes.csv`.
 ```csv
 Patient_ID,Gene_ID
 P001,GENE_001
@@ -385,24 +368,11 @@ P001,GENE_002
 
 ## 🎨 Screenshots
 
-> *Note: Add screenshots of your application here*
-
-- Dashboard showing system statistics
-- Diagnosis interface with model selection
-- Results visualization with charts
-- Model evaluation comparison
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-### Contribution Guidelines
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+| | |
+|---|---|
+| ![Why drawer for KNN: the nearest training genes and their votes](docs/screenshots/why-knn.png) | ![Report for one patient with the four verdicts](docs/screenshots/report.png) |
+| ![Proficiency plates: filled well = correct, ring = wrong](docs/screenshots/proficiency.png) | ![Custody: linear search through the linked list](docs/screenshots/custody.png) |
+| ![Freezer: hash table buckets and a key trace](docs/screenshots/freezer.png) | |
 
 ## 📝 License
 
@@ -410,27 +380,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👤 Author
 
-**Muhammad Hashir**
-
-- GitHub: [@Muhammad-Hashir-Code](https://github.com/Muhammad-Hashir-Code)
-- Email: siddiquimuhammadhashir1@gmail.com
-
-## 🙏 Acknowledgments
-
-- [cpp-httplib](https://github.com/yhirose/cpp-httplib) - HTTP server library
-- [Chart.js](https://www.chartjs.org/) - Data visualization library
-- CMake community for excellent build system documentation
-
-## 📚 Additional Resources
-
-- [Setup Guide](SETUP_GUIDE.md) - Detailed installation instructions
-- [Data Loading Troubleshooting](DATA_LOADING_TROUBLESHOOTING.md) - Common issues and solutions
-- [CMake Documentation](https://cmake.org/documentation/)
-
-## ⭐ Show Your Support
-
-If you find this project helpful, please consider giving it a ⭐ on GitHub!
-
----
-
-**Built with ❤️ using C++ and modern web technologies**
+Abdul Rahman — https://github.com/Abdulrahman10724

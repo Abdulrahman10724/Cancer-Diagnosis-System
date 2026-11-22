@@ -2,20 +2,20 @@
 
 ## Problem: Data Not Loading on Server
 
-The data loading fails when clicking **"Load Data on Server"** button. Here are the common causes and solutions:
+The data loading fails when choosing **Load data** on the **Setup** screen. Here are the common causes and solutions:
 
 ---
 
 ## **Issue 1: Server Not Running**
 
 ### Symptom:
-- Button click shows: `"Server load failed: Failed to fetch"`
+- Setup shows: **Server not running** — "Server not reachable at localhost:8080. Start cds_server and try again."
 - Error appears immediately (no timeout)
 
 ### Solution:
 1. Build the C++ server:
 ```bash
-cd "e:\dsaproject - Copy\CancerDiagnosisSystem"
+cd Cancer-Diagnosis-System
 mkdir -p build
 cd build
 cmake ..
@@ -24,7 +24,7 @@ cmake --build . --config Release
 
 2. Run the server **from the project root directory** (important!):
 ```bash
-cd "e:\dsaproject - Copy\CancerDiagnosisSystem"
+cd Cancer-Diagnosis-System
 ./build/Release/cds_server.exe
 # or on Linux/Mac:
 # ./build/cds_server
@@ -35,7 +35,7 @@ You should see:
 Starting server on http://localhost:8080 ...
 ```
 
-3. Keep the server terminal open while using the UI.
+3. Keep the server terminal open while using the web interface.
 
 ---
 
@@ -43,7 +43,7 @@ Starting server on http://localhost:8080 ...
 
 ### Symptom:
 - Server shows error: `Error: Could not open file data/genes.csv`
-- Status shows: `"Server load failed"`
+- Setup shows **Data not loaded** or the models stay **Not trained yet**
 
 ### Root Cause:
 The server looks for `data/genes.csv` **relative to where the server executable is running**, not where the executable is located.
@@ -51,14 +51,14 @@ The server looks for `data/genes.csv` **relative to where the server executable 
 ### Solution:
 **Always run the server from the project root:**
 ```bash
-cd "e:\dsaproject - Copy\CancerDiagnosisSystem"
+cd Cancer-Diagnosis-System
 ./build/Release/cds_server.exe
 ```
 
 **NOT from build/ directory:**
 ```bash
 # ❌ WRONG - will fail to find data files
-cd "e:\dsaproject - Copy\CancerDiagnosisSystem\build"
+cd Cancer-Diagnosis-System/build
 ./Release/cds_server.exe
 ```
 
@@ -73,7 +73,7 @@ cd "e:\dsaproject - Copy\CancerDiagnosisSystem\build"
 ### Solution:
 The server already has CORS headers. If still failing:
 1. Check browser console (F12 > Console)
-2. Verify server endpoint in UI Settings matches where server is running (default: `http://localhost:8080`)
+2. Verify the server address on the **Setup** screen matches where the server is running (default: `http://localhost:8080`)
 3. Make sure server is actually listening (check terminal output)
 
 ---
@@ -111,7 +111,7 @@ P002,Jane Smith,52
 
 ### 1. Start the Server
 ```bash
-cd "e:\dsaproject - Copy\CancerDiagnosisSystem"
+cd Cancer-Diagnosis-System
 ./build/Release/cds_server.exe
 ```
 
@@ -120,28 +120,27 @@ Expected output:
 Starting server on http://localhost:8080 ...
 ```
 
-### 2. Open UI in Browser
-- Serve the UI folder:
+### 2. Start the Web Interface
 ```bash
-cd "e:\dsaproject - Copy\CancerDiagnosisSystem\ui"
-python -m http.server 8000
-# Open: http://localhost:8000/index.html
+cd frontend
+npm install
+npm run dev
+# Open the address Vite prints, normally http://localhost:5173
 ```
 
-### 3. Verify Settings
-- Go to **Settings** section in UI
-- Check API Endpoint: `http://localhost:8080`
-- Click **Save Settings**
+### 3. Check the Server Address
+- The app opens on **Setup**
+- Under **Server address**, the API URL should be `http://localhost:8080`
+- If you change it, choose **Save and reconnect**
 
 ### 4. Load Data
-- Go to **Load Data** section
-- Click **"Load Data on Server"** button
-- Wait 3-5 seconds for models to train
+- On **Setup**, choose **Load data**
+- Wait a few seconds for the models to train
 
 ### 5. Verify Success
-- Check browser console (F12) for any errors
-- Look for success message in green
-- Check **Dashboard** - stats should update
+- **Server status** shows **Trained** with the gene and patient counts
+- The **Lab notebook** on the right records "Data loaded: … Models trained."
+- Check the browser console (F12) for any errors
 
 ---
 
@@ -166,24 +165,15 @@ If you don't see this, the data loading failed on the server side.
 ### Check Browser Network Tab
 1. Open DevTools (F12)
 2. Go to **Network** tab
-3. Click "Load Data on Server"
+3. Choose **Load data** on Setup
 4. Look for `POST /load` request
 5. Check response (should show geneticCount and patientCount > 0)
 
-### Enable Debug Logging
-Add to script.js before loadData call:
-```javascript
-// Add after fetch request
-.then(resp => {
-    console.log('Response status:', resp.status);
-    console.log('Response headers:', resp.headers);
-    return resp.json();
-})
-.then(data => {
-    console.log('Server returned:', data);
-    // ... rest of code
-})
+### Test the Server Directly
+```bash
+curl -X POST http://localhost:8080/load -d '{"genesFile":"data/genes.csv","patientsFile":"data/patients.csv"}'
 ```
+The response should show `"modelsTrained":true` with `geneticCount` and `patientCount` above 0.
 
 ---
 
@@ -192,7 +182,7 @@ Add to script.js before loadData call:
 - [ ] Server built with `cmake --build . --config Release`
 - [ ] Server running from project root (not from build/ folder)
 - [ ] Server shows "Starting server on http://localhost:8080"
-- [ ] UI endpoint in Settings is `http://localhost:8080`
+- [ ] Server address on the Setup screen is `http://localhost:8080`
 - [ ] CSV files exist in `data/` folder with correct headers
 - [ ] Browser console shows no errors (F12 > Console)
 - [ ] Network request shows 200 response (F12 > Network)
