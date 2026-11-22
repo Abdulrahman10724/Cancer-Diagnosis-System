@@ -1,0 +1,29 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-height: 36px;
+  padding: 0 14px 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--pill);
+  background: var(--surface);
+  font-size: var(--t15);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--ink);
+}
+
+.swatch {
+  width: 20px;
+  height: 4px;
+  border-radius: var(--pill);
+}
+
+.cost {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-muted);
+}

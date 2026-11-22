@@ -169,3 +169,9 @@
 .train :global(.train-window) {
   fill: var(--night);
 }
+
+.unlock {
+  fill: none;
+  stroke: var(--on-night);
+  stroke-width: 3;
+}

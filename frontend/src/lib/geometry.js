@@ -46,7 +46,7 @@ function vertical() {
   const width = 360;
   const coreX = 196;
   const trackTop = 138;
-  const first = 170;
+  const first = 206;
   const gap = 72;
   const stations = STATIONS.map((s, i) => ({ ...s, x: coreX, y: first + i * gap }));
   const at = (id) => stations.find((s) => s.id === id);

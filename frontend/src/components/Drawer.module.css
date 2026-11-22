@@ -1,0 +1,50 @@
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 24, 38, 0.45);
+}
+
+.panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
+.wide {
+  width: min(640px, 100vw);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  font-size: var(--t20);
+}
+
+.close {
+  min-width: 44px;
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s3);
+}

@@ -92,7 +92,7 @@ export const LINES = [
   },
   {
     key: 'graph',
-    name: 'Graph · BFS',
+    name: 'Graph\u00a0·\u00a0BFS',
     night: 'var(--n-graph)',
     day: 'var(--line-graph)',
     stops: ['predict'],

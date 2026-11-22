@@ -19,6 +19,8 @@ export default function MetroDiagram({
   speed = 1,
   states = {},
   currentId = null,
+  trainFromId = null,
+  unlockedId = null,
   activeLine = null,
   onLineEnter,
   onLineLeave,
@@ -61,6 +63,8 @@ export default function MetroDiagram({
   };
 
   const current = L.stations.find((s) => s.id === currentId);
+  const trainFrom = L.stations.find((s) => s.id === trainFromId) || current;
+  const trainPos = (s) => (horizontal ? { x: s.x - 52, y: s.y - 9 } : { x: s.x - 9, y: s.y - 52 });
 
   // Core segments leading into a locked station are dashed
   const lockedSegments = L.stations
@@ -191,7 +195,7 @@ export default function MetroDiagram({
           ? {
               role: 'link',
               tabIndex: 0,
-              'aria-label': `Station ${s.n}, ${s.name}, ${stateWord(state)}. ${dsCount(s.id)} data-structure lines stop here.`,
+              'aria-label': `Station ${s.n}, ${s.name}, ${stateWord(state)}. ${linesPhrase(dsCount(s.id))}`,
               'aria-disabled': state === 'locked' || undefined,
               onClick: () => onStation?.(s.id),
               onKeyDown: keyActivate(() => onStation?.(s.id)),
@@ -208,6 +212,18 @@ export default function MetroDiagram({
             {...popAnim(delay)}
           >
             {interactive && <circle cx={s.x} cy={s.y} r={30} className={styles.hitStation} />}
+            {s.id === unlockedId && !reduce && (
+              <motion.circle
+                cx={s.x}
+                cy={s.y}
+                r={18}
+                className={styles.unlock}
+                initial={{ scale: 0.8, opacity: 0.9 }}
+                animate={{ scale: 2, opacity: 0 }}
+                transition={{ delay: 0.75, duration: 0.6, ease: 'easeOut' }}
+                style={{ transformOrigin: `${s.x}px ${s.y}px` }}
+              />
+            )}
             {state === 'current' && !reduce && (
               <rect
                 x={s.x - w / 2 - 8}
@@ -235,9 +251,9 @@ export default function MetroDiagram({
       {interactive && current && (
         <motion.g
           className={styles.train}
-          initial={false}
-          animate={horizontal ? { x: current.x - 52, y: current.y - 9 } : { x: current.x - 9, y: current.y - 52 }}
-          transition={reduce ? { duration: 0 } : { duration: 0.7, ease: [0.22, 0.8, 0.3, 1] }}
+          initial={trainPos(trainFrom)}
+          animate={trainPos(current)}
+          transition={reduce ? { duration: 0 } : { delay: animate ? 1.6 : 0.15, duration: 0.7, ease: [0.22, 0.8, 0.3, 1] }}
           aria-hidden="true"
         >
           <TrainGlyph vertical={!horizontal} />
@@ -256,4 +272,10 @@ function stateWord(state) {
   if (state === 'current') return 'current station';
   if (state === 'locked') return 'locked';
   return '';
+}
+
+function linesPhrase(n) {
+  if (n === 0) return 'Only the core line stops here.';
+  if (n === 1) return 'One data-structure line stops here.';
+  return `${n} data-structure lines stop here.`;
 }

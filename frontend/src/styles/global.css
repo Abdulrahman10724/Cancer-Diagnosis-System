@@ -171,3 +171,56 @@ table {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Toasts */
+.toasts {
+  position: fixed;
+  right: var(--s3);
+  bottom: var(--s3);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  padding: 12px var(--s2);
+  border-radius: var(--r);
+  border: 1px solid var(--night-3);
+  background: var(--night-2);
+  color: var(--on-night);
+  font-size: var(--t15);
+  box-shadow: var(--shadow-float);
+}
+
+.toast-error {
+  border-color: var(--risk);
+  border-left-width: 4px;
+}
+
+.toast span {
+  flex: 1;
+}
+
+.toast-close {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+@media (max-width: 600px) {
+  .toasts {
+    left: var(--s2);
+    right: var(--s2);
+    bottom: var(--s2);
+    max-width: none;
+  }
+}
