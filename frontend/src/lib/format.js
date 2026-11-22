@@ -1,38 +1,13 @@
-// Consistent number formatting.
-export const pct = (r) => `${(r * 100).toFixed(1)}%`;
-export const pct0 = (r) => `${Math.round(r * 100)}%`;
-export const score = (s) => Number(s).toFixed(2);
-export const fixed = (n, d = 3) => Number(n).toFixed(d);
+export const pct = (v, digits = 0) => `${(v * 100).toFixed(digits)}%`;
 
-export function clock(date = new Date()) {
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+export function num(v, digits = 2) {
+  if (v === null || v === undefined || Number.isNaN(v)) return '–';
+  return Number(v).toFixed(digits);
 }
 
-// The model says "cancer" when its chance is at or above this line
-export const CANCER_LINE = 0.5;
+export const int = (v) => Math.round(v).toLocaleString('en-US');
 
-// Certainty of a probability: 0 at 0.5, 1 at 0 or 1
-export const certainty = (risk) => Math.abs(risk - 0.5) * 2;
-
-// Confidence shown to people, from how far the chance is from the 50% line
-export function confidence(risk) {
-  const c = certainty(risk);
-  if (c >= 0.6) return 'High';
-  if (c >= 0.25) return 'Medium';
-  return 'Low';
+export function featureValue(key, v) {
+  if (key === 'age' || key === 'highRiskGenes') return String(Math.round(v));
+  return num(v, 3);
 }
-
-// Display level only (the prediction itself always uses the 50% line)
-// Uses the rounded percentage people see, so "35%" is never called low.
-export function riskLevel(risk) {
-  const shown = Math.round(risk * 100);
-  if (shown < 35) return 'low';
-  if (shown <= 65) return 'medium';
-  return 'high';
-}
-
-export const RISK_WORD = { low: 'Low risk', medium: 'Medium risk', high: 'High risk' };
-
-export const outcomeWord = (prediction) => (prediction === 1 ? 'cancer' : 'no cancer');
-
-export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

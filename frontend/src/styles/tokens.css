@@ -1,56 +1,77 @@
 /*
- * Design tokens.
+ * Night Metro design tokens.
  *
- * Risk colours (--low, --medium, --high) mark risk and right/wrong only.
- * Model colours (--lr, --knn, --dt, --nb) identify models only and always appear
- * next to the model's name as text.
+ * Night surfaces: the map, the landing hero and the benchmark board.
+ * Platform surfaces: station pages (easy to read).
  *
- * Contrast (checked with the dataviz validator's contrast()):
- *   --low #1E9E6A is 3.41:1 and --medium #D99100 is 2.62:1 on white, so they are
- *   used for bars, icons and fills only. Risk words use the -ink shades:
- *   --low-ink #13724C 5.93:1, --medium-ink #8A5C00 5.81:1, --high-ink #B42323 6.55:1
- *   on white (5.3:1 or more on their tints).
- *   Model colours on white: lightness, chroma, colour-blind and normal-vision
- *   separation PASS; --knn amber is 2.95:1, so its name is always printed beside it.
+ * Line colours (one hue per data structure), checked with the dataviz validator:
+ *   dark  on #101826: #4778F5 #DB7618 #9460E8 #10A58C #B38A12 #EA4D82  -> all checks PASS
+ *         (gold and pink tuned from the brief's #AB8510 / #EC4F75 to lift CVD separation 8.0 -> 10.1)
+ *   light on #FFFFFF: #2F6BFF #FF8A00 #8E44EC #00A88F #C49A00 #F0436A  -> PASS, contrast WARN for
+ *         orange and gold, so every line mark always shows its name as text.
+ * Outcome colours (safe / mid / risk) are never used for lines and always come with an icon and a word.
+ * Models are not coloured: they use ink shades and dash patterns, so colour always means a data structure.
  */
 :root {
-  --bg: #F6F8FB;
+  --night: #101826;
+  --night-2: #172133;
+  --night-3: #22304a;
+  --platform: #F4F6FA;
   --surface: #FFFFFF;
-  --text: #18212F;
-  --muted: #5A6577;
-  --border: #E3E8EF;
-  --border-strong: #C5CDD8;
+  --ink: #121A2B;
+  --ink-muted: #5B6476;
+  --on-night: #E9EDF5;
+  --on-night-muted: #93A0B5;
+  --rail: #8A93A6;
+  --rail-soft: #C9CFDA;
+  --border: #DDE2EA;
+  --border-strong: #B9C1CF;
+  --tint: #EAEEF5;
 
-  --primary: #2D5BFF;
-  --primary-hover: #1F47D6;
-  --primary-tint: #EBF0FF;
+  /* Lines on night */
+  --n-hash: #4778F5;
+  --n-merge: #DB7618;
+  --n-kd: #9460E8;
+  --n-avl: #10A58C;
+  --n-heap: #B38A12;
+  --n-graph: #EA4D82;
+  /* Lines on platform */
+  --line-hash: #2F6BFF;
+  --line-merge: #FF8A00;
+  --line-kd: #8E44EC;
+  --line-avl: #00A88F;
+  --line-heap: #C49A00;
+  --line-graph: #F0436A;
 
-  --low: #1E9E6A;
-  --medium: #D99100;
-  --high: #D93A3A;
-  --low-ink: #13724C;
-  --medium-ink: #8A5C00;
-  --high-ink: #B42323;
-  --low-tint: #E8F6F0;
-  --medium-tint: #FDF3DF;
-  --high-tint: #FCEBEB;
+  /* Outcomes */
+  --safe: #2E9E5B;
+  --risk: #D92D20;
+  --mid: #B7791F;
+  --safe-ink: #1D7343;
+  --risk-ink: #B42318;
+  --mid-ink: #8A5A12;
+  --safe-tint: #E7F5EC;
+  --risk-tint: #FDECEA;
+  --mid-tint: #FBF1E0;
 
-  --lr: #6A3FA0;
-  --knn: #C98A00;
-  --dt: #D0457E;
-  --nb: #0089B0;
+  /* Models: ink shades + dash patterns */
+  --m-logistic: #121A2B;
+  --m-knn: #3E4A63;
+  --m-tree: #66728A;
+  --m-bayes: #8D97AB;
 
-  /* Type scale (rem) */
-  --text-xs: 0.8125rem;
-  --text-sm: 0.9375rem;
-  --text-md: 1.0625rem;
-  --text-lg: 1.375rem;
-  --text-xl: 1.875rem;
-  --text-2xl: 2.5rem;
+  /* Type */
+  --font: 'Overpass', system-ui, sans-serif;
+  --mono: 'Overpass Mono', ui-monospace, monospace;
+  --t13: 0.8125rem;
+  --t15: 0.9375rem;
+  --t17: 1.0625rem;
+  --t20: 1.25rem;
+  --t28: 1.75rem;
+  --t40: 2.5rem;
+  --t56: 3.5rem;
 
-  --font-ui: 'Atkinson Hyperlegible Next', 'Atkinson Hyperlegible', system-ui, sans-serif;
-
-  /* 8px spacing grid */
+  /* 8px grid */
   --s1: 8px;
   --s2: 16px;
   --s3: 24px;
@@ -58,14 +79,11 @@
   --s5: 40px;
   --s6: 48px;
   --s8: 64px;
+  --s10: 80px;
 
-  --radius-card: 12px;
-  --radius-control: 8px;
-  --shadow-raised: 0 1px 2px rgba(24, 33, 47, 0.06), 0 8px 24px rgba(24, 33, 47, 0.08);
-  --shadow-panel: -12px 0 32px rgba(24, 33, 47, 0.16);
-  --focus: 2px solid var(--primary);
-
-  --sidebar-width: 256px;
-  --content-max: 1120px;
-  --tabbar-height: 64px;
+  --r: 6px;
+  --pill: 999px;
+  --content: 1200px;
+  --shadow-float: 0 2px 4px rgba(18, 26, 43, 0.06), 0 12px 32px rgba(18, 26, 43, 0.14);
+  --ease: cubic-bezier(0.22, 0.8, 0.3, 1);
 }
