@@ -243,7 +243,17 @@ int serverMain() {
                << "\",\"name\":\"" << json_escape(p.getName())
                << "\",\"age\":" << p.getAge()
                << ",\"riskScore\":" << p.getRiskScore()
-               << ",\"prediction\":" << p.getPrediction() << "}";
+               << ",\"prediction\":" << p.getPrediction()
+               << ",\"genes\":[";
+            bool firstGene = true;
+            for (const auto& g : p.getGeneticData()) {
+                if (!firstGene) ss << ",";
+                firstGene = false;
+                ss << "{\"gene_id\":\"" << json_escape(g.getGeneId())
+                   << "\",\"mutation_score\":" << g.getMutationScore()
+                   << ",\"label\":" << g.getLabel() << "}";
+            }
+            ss << "]}";
             first = false;
         }
         ss << "]";
