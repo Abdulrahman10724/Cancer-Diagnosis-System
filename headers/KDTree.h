@@ -17,6 +17,7 @@
  * Complexity (n points, d dimensions):
  *   build      O(n log^2 n)  (a merge sort per level)
  *   kNearest   O(log n + K log K) average, O(n log K) worst case
+ *   withinRadius O(n^(1-1/d) + m) typical for m results, O(n) worst case
  *   memory     O(n d)
  */
 class KDTree {
@@ -40,6 +41,9 @@ public:
     void build(const std::vector<std::vector<double>>& points);
     // K nearest rows, closest first; visited counts the nodes examined
     std::vector<Neighbor> kNearest(const std::vector<double>& query, size_t k, long* visited = nullptr) const;
+
+    // Every row within distance r of query (r inclusive), in no particular order
+    std::vector<Neighbor> withinRadius(const std::vector<double>& query, double r, long* visited = nullptr) const;
 
     const std::vector<Node>& getNodes() const;
     int getRoot() const;

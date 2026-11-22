@@ -28,6 +28,7 @@ add_library(cds_core STATIC
     src/ModelSet.cpp
     src/NaiveBayesClassifier.cpp
     src/Patient.cpp
+    src/PatientGraph.cpp
     src/Sampling.cpp
     src/Sorting.cpp
 )

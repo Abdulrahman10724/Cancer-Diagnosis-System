@@ -1,12 +1,15 @@
 #include "../headers/CancerDiagnosisSystem.h"
 #include "../headers/Json.h"
 #include "../headers/DatasetStore.h"
+#include "../headers/PatientGraph.h"
+#include "../headers/Sorting.h"
 #include <cerrno>
 #include <cstdlib>
 #include <iostream>
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <cmath>
 #include <vector>
 
 // Single-header HTTP library (third_party/httplib.h)
@@ -65,6 +68,16 @@ bool readBody(const httplib::Request& req, httplib::Response& res, JsonValue& bo
 string stringField(const JsonValue& body, const string& key, const string& fallback = "") {
     const JsonValue* v = body.get(key);
     return (v && v->isString()) ? v->text : fallback;
+}
+
+bool parseDoubleParam(const string& s, double& out) {
+    if (s.empty()) return false;
+    char* end = nullptr;
+    errno = 0;
+    double v = std::strtod(s.c_str(), &end);
+    if (end != s.c_str() + s.size() || errno == ERANGE || !std::isfinite(v)) return false;
+    out = v;
+    return true;
 }
 
 bool parseIntParam(const string& s, long& out) {
@@ -849,6 +862,133 @@ int serverMain() {
            << ",\"height\":" << tree.height() << ",\"depth\":" << depth
            << ",\"root\":" << kdNodeJson(tree, system.getModels().scaler, system.getTrainPatients(),
                                           tree.getRoot(), 0, static_cast<int>(depth)) << "}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // Shared by /graph and /graph/bfs: reads ?eps= and builds the graph over every patient
+    auto buildGraph = [&](const httplib::Request& req, httplib::Response& res, PatientGraph& graph,
+                          std::vector<const Patient*>& patients, long& kdVisited) {
+        double eps = 0.6;
+        if (req.has_param("eps") && (!parseDoubleParam(req.get_param_value("eps"), eps) || eps <= 0.0 || eps > 10.0)) {
+            sendError(res, 400, "eps must be a number above 0 and at most 10");
+            return false;
+        }
+        if (!system.areModelsTrained()) {
+            sendError(res, 400, "Load data first");
+            return false;
+        }
+        patients = system.patientsInOrder();
+        std::vector<std::vector<double>> rows;
+        rows.reserve(patients.size());
+        for (const Patient* p : patients) rows.push_back(system.getModels().scaler.transform(p->getFeatures()));
+        kdVisited = graph.build(rows, eps);
+        return true;
+    };
+
+    // GET /graph?eps=0.6 -> nodes, edges and connected components
+    svr.Get("/graph", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        PatientGraph graph;
+        std::vector<const Patient*> patients;
+        long visited = 0;
+        if (!buildGraph(req, res, graph, patients, visited)) return;
+
+        std::vector<int> comp;
+        size_t count = graph.components(comp);
+        const int F = FeatureExtractor::NUM_FEATURES;
+        std::vector<size_t> size(count, 0), labelled(count, 0), cancer(count, 0);
+        std::vector<std::vector<double>> sum(count, std::vector<double>(F, 0.0));
+        for (size_t i = 0; i < patients.size(); ++i) {
+            size_t c = static_cast<size_t>(comp[i]);
+            size[c]++;
+            if (patients[i]->isLabelled()) {
+                labelled[c]++;
+                if (patients[i]->getDiagnosis() == 1) cancer[c]++;
+            }
+            const std::vector<double>& f = patients[i]->getFeatures();
+            for (int j = 0; j < F; ++j) sum[c][static_cast<size_t>(j)] += f[static_cast<size_t>(j)];
+        }
+        // Largest components first; equal sizes keep their order
+        std::vector<size_t> order(count);
+        for (size_t c = 0; c < count; ++c) order[c] = c;
+        Sorting::mergeSortBy(order, [&size](size_t a, size_t b) { return size[a] > size[b]; });
+
+        std::ostringstream ss;
+        ss << "{\"eps\":" << jsonNumber(graph.getEps()) << ",\"edgeSearch\":\"kd-tree radius search\""
+           << ",\"kdNodesVisited\":" << visited << ",\"featureNames\":" << featureNamesJson()
+           << ",\"nodeCount\":" << graph.nodeCount() << ",\"edgeCount\":" << graph.edgeCount() << ",\"nodes\":[";
+        for (size_t i = 0; i < patients.size(); ++i) {
+            if (i) ss << ",";
+            const Patient* p = patients[i];
+            ss << "{\"id\":" << jsonString(p->getPatientId()) << ",\"features\":" << featuresJson(p->getFeatures())
+               << ",\"diagnosis\":" << (p->isLabelled() ? std::to_string(p->getDiagnosis()) : string("null"))
+               << ",\"component\":" << comp[i] << "}";
+        }
+        ss << "],\"edges\":[";
+        bool first = true;
+        for (size_t i = 0; i < graph.nodeCount(); ++i) {
+            for (const auto& e : graph.neighbors(i)) {
+                if (e.to <= i) continue;
+                if (!first) ss << ",";
+                first = false;
+                ss << "{\"a\":" << jsonString(patients[i]->getPatientId()) << ",\"b\":"
+                   << jsonString(patients[e.to]->getPatientId()) << ",\"distance\":" << jsonNumber(e.distance) << "}";
+            }
+        }
+        ss << "],\"components\":{\"count\":" << count << ",\"isolated\":";
+        size_t isolated = 0;
+        for (size_t c = 0; c < count; ++c) if (size[c] == 1) isolated++;
+        ss << isolated << ",\"list\":[";
+        for (size_t k = 0; k < count; ++k) {
+            size_t c = order[k];
+            if (k) ss << ",";
+            std::vector<double> mean(F, 0.0);
+            for (int j = 0; j < F; ++j) mean[static_cast<size_t>(j)] = sum[c][static_cast<size_t>(j)] / static_cast<double>(size[c]);
+            ss << "{\"component\":" << c << ",\"size\":" << size[c] << ",\"labelled\":" << labelled[c]
+               << ",\"cancerRate\":" << (labelled[c] ? jsonNumber(static_cast<double>(cancer[c]) / static_cast<double>(labelled[c])) : string("null"))
+               << ",\"meanFeatures\":" << featuresJson(mean) << "}";
+        }
+        ss << "]}}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /graph/bfs?start=ID&eps=0.6 -> breadth-first visit order with levels
+    svr.Get("/graph/bfs", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        string start = req.has_param("start") ? req.get_param_value("start") : "";
+        if (start.empty()) {
+            sendError(res, 400, "Missing start (a patient ID)");
+            return;
+        }
+        PatientGraph graph;
+        std::vector<const Patient*> patients;
+        long visited = 0;
+        if (!buildGraph(req, res, graph, patients, visited)) return;
+        size_t startIndex = patients.size();
+        for (size_t i = 0; i < patients.size(); ++i) {
+            if (patients[i]->getPatientId() == start) {
+                startIndex = i;
+                break;
+            }
+        }
+        if (startIndex == patients.size()) {
+            sendError(res, 404, "Patient '" + start + "' not found");
+            return;
+        }
+        std::vector<PatientGraph::Visit> order = graph.bfs(startIndex);
+        int levels = 0;
+        std::ostringstream ss;
+        ss << "{\"start\":" << jsonString(start) << ",\"eps\":" << jsonNumber(graph.getEps()) << ",\"order\":[";
+        for (size_t i = 0; i < order.size(); ++i) {
+            const PatientGraph::Visit& v = order[i];
+            const Patient* p = patients[v.node];
+            if (v.level + 1 > levels) levels = v.level + 1;
+            if (i) ss << ",";
+            ss << "{\"id\":" << jsonString(p->getPatientId()) << ",\"level\":" << v.level << ",\"parent\":"
+               << (v.parent < 0 ? string("null") : jsonString(patients[static_cast<size_t>(v.parent)]->getPatientId()))
+               << ",\"diagnosis\":" << (p->isLabelled() ? std::to_string(p->getDiagnosis()) : string("null")) << "}";
+        }
+        ss << "],\"reached\":" << order.size() << ",\"levels\":" << levels << ",\"nodeCount\":" << graph.nodeCount() << "}";
         sendJson(res, 200, ss.str());
     });
 

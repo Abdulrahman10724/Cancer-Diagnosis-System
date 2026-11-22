@@ -47,6 +47,20 @@ void searchNode(const std::vector<KDTree::Node>& nodes, const std::vector<std::v
     }
 }
 
+void radiusNode(const std::vector<KDTree::Node>& nodes, const std::vector<std::vector<double>>& points,
+                int nodeIndex, const std::vector<double>& q, double r2, std::vector<KDTree::Neighbor>& out,
+                long& visited) {
+    if (nodeIndex < 0) return;
+    const KDTree::Node& node = nodes[static_cast<size_t>(nodeIndex)];
+    visited++;
+    double d2 = KDTree::distance2(q, points[node.point]);
+    if (d2 <= r2) out.push_back(KDTree::Neighbor{std::sqrt(d2), node.point});
+    double diff = q[static_cast<size_t>(node.axis)] - node.split;
+    // Points on the left have coordinate <= split, on the right >= split
+    if (diff <= 0.0 || diff * diff <= r2) radiusNode(nodes, points, node.left, q, r2, out, visited);
+    if (diff >= 0.0 || diff * diff <= r2) radiusNode(nodes, points, node.right, q, r2, out, visited);
+}
+
 } // namespace
 
 KDTree::KDTree() : root(-1), dims(0) {}
@@ -113,6 +127,16 @@ std::vector<KDTree::Neighbor> KDTree::kNearest(const std::vector<double>& query,
         Candidate c = heap.pop();
         out[i - 1] = Neighbor{std::sqrt(c.d2), c.index};
     }
+    return out;
+}
+
+std::vector<KDTree::Neighbor> KDTree::withinRadius(const std::vector<double>& query, double r, long* visited) const {
+    std::vector<Neighbor> out;
+    if (root < 0 || r < 0.0) return out;
+    if (query.size() != dims) throw std::runtime_error("Query has the wrong number of dimensions");
+    long count = 0;
+    radiusNode(nodes, points, root, query, r * r, out, count);
+    if (visited) *visited += count;
     return out;
 }
 
