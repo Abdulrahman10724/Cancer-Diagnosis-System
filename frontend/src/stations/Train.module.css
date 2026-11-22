@@ -1,0 +1,286 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.formula {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: var(--r);
+  background: var(--platform);
+  font-size: var(--t15);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.chartTitle {
+  font-weight: 600;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+/* Logistic bars */
+.bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+}
+
+.barRow {
+  display: grid;
+  grid-template-columns: 170px 1fr 56px;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.barName {
+  font-weight: 600;
+}
+
+.barTrack {
+  height: 20px;
+  border-radius: 4px;
+  background: var(--platform);
+  overflow: hidden;
+}
+
+.bar {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--ink);
+}
+
+.barValue {
+  text-align: right;
+  font-weight: 700;
+}
+
+/* KNN */
+.kRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s2);
+}
+
+.range {
+  width: 220px;
+  accent-color: var(--ink);
+}
+
+.scrollX {
+  overflow-x: auto;
+}
+
+.kd {
+  display: block;
+  width: 100%;
+  min-width: 760px;
+  height: auto;
+  font-family: var(--font);
+}
+
+.level {
+  fill: transparent;
+}
+
+.levelOn {
+  fill: var(--tint);
+}
+
+.edge {
+  stroke: var(--line-kd);
+  stroke-width: 2;
+  fill: none;
+}
+
+.kdNode {
+  outline: none;
+}
+
+.kdBox {
+  fill: var(--surface);
+  stroke: var(--line-kd);
+  stroke-width: 2;
+}
+
+.kdNode:focus-visible .kdBox {
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.kdFeature {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.kdSize {
+  fill: var(--ink-muted);
+  font-size: 13px;
+}
+
+/* Decision tree outline */
+.tree,
+.children {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.children {
+  margin-left: 22px;
+  padding-left: var(--s2);
+  border-left: 2px solid var(--line-merge);
+}
+
+.node {
+  margin: 4px 0;
+}
+
+.toggle,
+.leaf {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s1);
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: transparent;
+  text-align: left;
+  font-size: var(--t15);
+}
+
+.toggle {
+  cursor: pointer;
+}
+
+.toggle:hover {
+  border-color: var(--border);
+  background: var(--platform);
+}
+
+.leaf {
+  padding-left: 40px;
+}
+
+.chev {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.nodeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.answer {
+  min-width: 30px;
+  color: var(--ink-muted);
+  font-weight: 700;
+}
+
+.question {
+  font-weight: 700;
+}
+
+.nodeMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+}
+
+.mini {
+  display: inline-block;
+  width: 60px;
+  height: 6px;
+  border-radius: var(--pill);
+  background: var(--dx-clear);
+  overflow: hidden;
+}
+
+.mini span {
+  display: block;
+  height: 100%;
+  background: var(--dx-cancer);
+}
+
+/* Naive Bayes */
+.bell {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font);
+}
+
+.axis {
+  stroke: var(--ink-muted);
+}
+
+.tick {
+  fill: var(--ink-muted);
+  font-size: 13px;
+}
+
+.axisTitle {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.areaCancer {
+  fill: var(--dx-cancer);
+  fill-opacity: 0.12;
+}
+
+.areaClear {
+  fill: var(--dx-clear);
+  fill-opacity: 0.18;
+}
+
+.lineCancer,
+.lineClear {
+  fill: none;
+  stroke-width: 3;
+}
+
+.lineCancer {
+  stroke: var(--dx-cancer);
+}
+
+.lineClear {
+  stroke: var(--dx-clear);
+}
+
+@media (max-width: 720px) {
+  .barRow {
+    grid-template-columns: 1fr 48px;
+  }
+
+  .barName {
+    grid-column: 1 / -1;
+  }
+}

@@ -1,0 +1,59 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+}
+
+.top > :last-child {
+  margin-left: auto;
+}
+
+.caption {
+  font-weight: 600;
+  min-height: 1.6em;
+}
+
+.foldControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  max-width: 900px;
+  height: auto;
+  font-family: var(--font);
+}
+
+.groupTitle {
+  fill: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.groupNote {
+  fill: var(--ink-muted);
+  font-size: 15px;
+}
+
+.cancer {
+  fill: var(--dx-cancer);
+}
+
+.clear {
+  fill: var(--dx-clear);
+}
+
+.cvSummary {
+  font-weight: 600;
+}
