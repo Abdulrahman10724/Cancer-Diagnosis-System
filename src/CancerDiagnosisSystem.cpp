@@ -102,6 +102,18 @@ void CancerDiagnosisSystem::refreshRisks() {
         double mean = sum / ModelSet::NUM_MODELS;
         n->patient.setRisk(mean, mean >= 0.5 ? 1 : 0);
     }
+    rebuildIndexes();
+}
+
+void CancerDiagnosisSystem::rebuildIndexes() {
+    idIndex.clear();
+    riskIndex.clear();
+    for (PatientNode* n = head.get(); n; n = n->next.get()) {
+        idIndex.insert(n->patient.getPatientId(), &n->patient);
+        if (n->patient.getHasRisk()) {
+            riskIndex.insert(RiskKey{n->patient.getRiskScore(), n->patient.getPatientId()}, &n->patient);
+        }
+    }
 }
 
 bool CancerDiagnosisSystem::areModelsTrained() const { return models.trained; }
@@ -121,10 +133,33 @@ std::vector<const Patient*> CancerDiagnosisSystem::patientsInOrder() const {
 }
 
 const Patient* CancerDiagnosisSystem::findPatient(const std::string& id) const {
+    Patient* p = nullptr;
+    return idIndex.find(id, &p) ? p : nullptr;
+}
+
+const Patient* CancerDiagnosisSystem::findPatientLinear(const std::string& id) const {
     for (PatientNode* n = head.get(); n; n = n->next.get()) {
         if (n->patient.getPatientId() == id) return &n->patient;
     }
     return nullptr;
+}
+
+bool CancerDiagnosisSystem::indexLookup(const std::string& id, std::vector<std::string>& path, int& steps,
+                                        int& height) const {
+    path.clear();
+    steps = 0;
+    height = idIndex.height();
+    return idIndex.find(id, nullptr, &path, &steps);
+}
+
+std::vector<const Patient*> CancerDiagnosisSystem::riskRange(double lo, double hi, int& visited) const {
+    visited = 0;
+    // Smallest and largest possible IDs bound the range on the second key
+    RiskKey from{lo, ""};
+    RiskKey to{hi, std::string(64, '\xff')};
+    std::vector<const Patient*> out;
+    for (const auto& entry : riskIndex.rangeQuery(from, to, &visited)) out.push_back(entry.second);
+    return out;
 }
 
 bool CancerDiagnosisSystem::searchPatientTrace(const std::string& id, std::vector<std::string>& visitedOrder) const {

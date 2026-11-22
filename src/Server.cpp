@@ -414,6 +414,63 @@ int serverMain() {
         sendJson(res, 200, ss.str());
     });
 
+    // GET /patients/index?id=P007 -> AVL lookup with the keys visited
+    svr.Get("/patients/index", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        string id = req.has_param("id") ? req.get_param_value("id") : string();
+        if (id.empty()) {
+            sendError(res, 400, "Missing id");
+            return;
+        }
+        std::vector<string> path;
+        int steps = 0;
+        int height = 0;
+        bool found = system.indexLookup(id, path, steps, height);
+        std::ostringstream ss;
+        ss << "{\"found\":" << (found ? "true" : "false") << ",\"steps\":" << steps << ",\"path\":[";
+        for (size_t i = 0; i < path.size(); ++i) ss << (i ? "," : "") << jsonString(path[i]);
+        ss << "],\"height\":" << height << ",\"size\":" << system.getPatientCount() << "}";
+        sendJson(res, 200, ss.str());
+    });
+
+    // GET /patients/range?min=0.4&max=0.6 -> patients by consensus risk (AVL risk index)
+    svr.Get("/patients/range", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        auto readNumber = [&](const char* name, double fallback, double& out) {
+            if (!req.has_param(name)) {
+                out = fallback;
+                return true;
+            }
+            string v = req.get_param_value(name);
+            char* end = nullptr;
+            out = std::strtod(v.c_str(), &end);
+            return !v.empty() && end == v.c_str() + v.size();
+        };
+        double lo = 0.0;
+        double hi = 1.0;
+        if (!readNumber("min", 0.0, lo) || !readNumber("max", 1.0, hi) || lo < 0.0 || hi > 1.0 || lo > hi) {
+            sendError(res, 400, "min and max must be numbers with 0 <= min <= max <= 1");
+            return;
+        }
+        if (!system.areModelsTrained()) {
+            sendError(res, 400, "Load data first");
+            return;
+        }
+        int visited = 0;
+        auto found = system.riskRange(lo, hi, visited);
+        std::ostringstream ss;
+        ss << "{\"min\":" << jsonNumber(lo) << ",\"max\":" << jsonNumber(hi) << ",\"count\":" << found.size()
+           << ",\"visited\":" << visited << ",\"patients\":[";
+        for (size_t i = 0; i < found.size(); ++i) {
+            if (i) ss << ",";
+            ss << "{\"patient_id\":" << jsonString(found[i]->getPatientId())
+               << ",\"name\":" << jsonString(found[i]->getName())
+               << ",\"risk\":" << jsonNumber(found[i]->getRiskScore()) << "}";
+        }
+        ss << "]}";
+        sendJson(res, 200, ss.str());
+    });
+
     // GET /genetic -> every gene and its mutation score (insertion order)
     svr.Get("/genetic", [&](const httplib::Request&, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);

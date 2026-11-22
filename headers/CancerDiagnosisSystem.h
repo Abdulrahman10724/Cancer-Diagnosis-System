@@ -11,6 +11,7 @@
 #include "ModelSet.h"
 #include "EvaluationMetrics.h"
 #include "LinkedQueue.h"
+#include "AVLTree.h"
 
 /**
  * @struct PatientNode
@@ -153,6 +154,23 @@ struct GeneReport {
     double sentScore;
 };
 
+// Key of the risk index: ordered by risk, then by patient ID
+struct RiskKey {
+    double risk;
+    std::string id;
+};
+
+struct RiskKeyLess {
+    bool operator()(const RiskKey& a, const RiskKey& b) const {
+        if (a.risk != b.risk) return a.risk < b.risk;
+        return a.id < b.id;
+    }
+};
+
+struct StringLess {
+    bool operator()(const std::string& a, const std::string& b) const { return a < b; }
+};
+
 struct QueueResult {
     const Patient* patient;
     double risk;
@@ -184,6 +202,11 @@ private:
     // Test queue (FIFO of patient IDs)
     LinkedQueue<std::string> testQueue;
 
+    // AVL indexes, rebuilt whenever patients or their risks change
+    AVLTree<std::string, Patient*, StringLess> idIndex;   // Patient_ID -> patient
+    AVLTree<RiskKey, Patient*, RiskKeyLess> riskIndex;    // (risk, Patient_ID) -> patient
+    void rebuildIndexes();
+
     void install(LoadedDataset& data, const DatasetFiles& f, const std::string& name);
     void appendPatient(const Patient& p);
     void refreshFeatures(Patient& p) const;
@@ -212,7 +235,12 @@ public:
     // Patients (linked list)
     size_t getPatientCount() const;
     std::vector<const Patient*> patientsInOrder() const;
-    const Patient* findPatient(const std::string& id) const;               // linear search
+    const Patient* findPatient(const std::string& id) const;               // AVL ID index, O(log n)
+    const Patient* findPatientLinear(const std::string& id) const;         // linked list, O(n)
+    // AVL lookup with the keys visited on the way down
+    bool indexLookup(const std::string& id, std::vector<std::string>& path, int& steps, int& height) const;
+    // Patients with lo <= risk <= hi, in risk order (AVL risk index)
+    std::vector<const Patient*> riskRange(double lo, double hi, int& visited) const;
     bool searchPatientTrace(const std::string& id, std::vector<std::string>& visitedOrder) const;
     // status: 200 ok, 400 bad input, 409 duplicate; error set otherwise
     int addPatient(const NewPatientInput& input, std::vector<GeneReport>& report, std::string& error);
