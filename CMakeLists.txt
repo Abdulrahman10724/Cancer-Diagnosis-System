@@ -55,3 +55,9 @@ endif()
 # Synthetic data generator
 add_executable(cds_datagen tools/generate_data.cpp src/FeatureExtractor.cpp src/Patient.cpp src/HashMapper.cpp)
 target_include_directories(cds_datagen PRIVATE headers)
+
+# Unit tests: build, then run ctest in the build folder
+enable_testing()
+add_executable(cds_tests tests/test_main.cpp)
+target_link_libraries(cds_tests PRIVATE cds_core)
+add_test(NAME cds_tests COMMAND cds_tests WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
