@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
 project(CancerDiagnosisSystem CXX)
 
+# Single-config generators (Makefiles, MinGW, Ninja) build without optimisation when no
+# build type is given; default to Release so the server and the benchmark run at full speed.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "No CMAKE_BUILD_TYPE given: using Release")
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type (Debug, Release, RelWithDebInfo, MinSizeRel)" FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

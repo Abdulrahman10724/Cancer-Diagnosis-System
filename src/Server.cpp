@@ -278,6 +278,8 @@ int serverMain() {
     CancerDiagnosisSystem system;
     // All handlers share one system object; cpp-httplib runs handlers on a thread pool
     std::mutex systemMutex;
+    // At most one /benchmark run at a time (it does not use the system object)
+    std::mutex benchmarkMutex;
 
     svr.set_payload_max_length(5 * 1024 * 1024);
 
@@ -995,15 +997,22 @@ int serverMain() {
 
     // GET /benchmark?n=2000&seed=1 -> timings on synthetic patients (the loaded dataset is not used)
     svr.Get("/benchmark", [&](const httplib::Request& req, httplib::Response& res) {
-        std::lock_guard<std::mutex> lock(systemMutex);
+        // No systemMutex here: Benchmark::run builds its own synthetic patients in memory and
+        // never touches the CancerDiagnosisSystem object, so other requests can run meanwhile
+        // (a 20,000-patient run takes many seconds). benchmarkMutex only stops two runs at once.
         long n = 2000;
         long seed = 1;
         if (req.has_param("n") && (!parseIntParam(req.get_param_value("n"), n) || n < static_cast<long>(Benchmark::MIN_N))) {
             sendError(res, 400, "n must be a whole number of at least 10 (values above 20000 are capped)");
             return;
         }
-        if (req.has_param("seed") && (!parseIntParam(req.get_param_value("seed"), seed) || seed < 0 || seed > 4294967295L)) {
+        if (req.has_param("seed") && (!parseIntParam(req.get_param_value("seed"), seed) || seed < 0 || static_cast<unsigned long long>(seed) > 4294967295ULL)) {
             sendError(res, 400, "seed must be a whole number from 0 to 4294967295");
+            return;
+        }
+        std::unique_lock<std::mutex> running(benchmarkMutex, std::try_to_lock);
+        if (!running.owns_lock()) {
+            sendError(res, 429, "A benchmark is already running. Try again in a few seconds.");
             return;
         }
         bool capped = n > static_cast<long>(Benchmark::MAX_N);
