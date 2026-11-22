@@ -56,7 +56,10 @@ function Disagree({ result }) {
   if (votes === 0 || votes === 4) return null;
   return (
     <div className={styles.disagree} role="note">
-      <strong>The models disagree ({votes} say cancer, {4 - votes} say no cancer).</strong>
+      <strong>
+        The models disagree ({votes} {votes === 1 ? 'says' : 'say'} cancer, {4 - votes}{' '}
+        {4 - votes === 1 ? 'says' : 'say'} no cancer).
+      </strong>
       <span>
         {Math.abs(result.featureRaw - 0.5) < 0.12
           ? `This patient's average gene score (${score(result.featureRaw)}) is close to the middle, where cancer and normal genes overlap. Small differences between the models change the answer.`

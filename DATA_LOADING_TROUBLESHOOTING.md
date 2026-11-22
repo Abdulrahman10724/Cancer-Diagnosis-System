@@ -2,14 +2,14 @@
 
 ## Problem: Data Not Loading on Server
 
-The data loading fails when choosing **Load data** on the **Setup** screen. Here are the common causes and solutions:
+The data loading fails when choosing **Load data** on the **Start** screen (or from step 1 on Home). Here are the common causes and solutions:
 
 ---
 
 ## **Issue 1: Server Not Running**
 
 ### Symptom:
-- Setup shows: **Server not running** — "Server not reachable at localhost:8080. Start cds_server and try again."
+- A red banner says: "The server is not running. Start cds_server and press Retry."
 - Error appears immediately (no timeout)
 
 ### Solution:
@@ -43,7 +43,7 @@ Starting server on http://localhost:8080 ...
 
 ### Symptom:
 - Server shows error: `Error: Could not open file data/genes.csv`
-- Setup shows **Data not loaded** or the models stay **Not trained yet**
+- Start shows **Data not loaded**, or a blue banner keeps saying "Data not loaded yet."
 
 ### Root Cause:
 The server looks for `data/genes.csv` **relative to where the server executable is running**, not where the executable is located.
@@ -73,7 +73,7 @@ cd Cancer-Diagnosis-System/build
 ### Solution:
 The server already has CORS headers. If still failing:
 1. Check browser console (F12 > Console)
-2. Verify the server address on the **Setup** screen matches where the server is running (default: `http://localhost:8080`)
+2. Verify the server address on the **Start** screen (under Advanced) matches where the server is running (default: `http://localhost:8080`)
 3. Make sure server is actually listening (check terminal output)
 
 ---
@@ -129,17 +129,17 @@ npm run dev
 ```
 
 ### 3. Check the Server Address
-- The app opens on **Setup**
-- Under **Server address**, the API URL should be `http://localhost:8080`
+- Open **Start / Settings** and then **Advanced: server address**
+- The API URL should be `http://localhost:8080`
 - If you change it, choose **Save and reconnect**
 
 ### 4. Load Data
-- On **Setup**, choose **Load data**
+- On **Start**, choose **Load data**
 - Wait a few seconds for the models to train
 
 ### 5. Verify Success
-- **Server status** shows **Trained** with the gene and patient counts
-- The **Lab notebook** on the right records "Data loaded: … Models trained."
+- The checklist ticks every stage and says "Loaded … genes and … patients. All 4 models are trained."
+- **Activity** (top right) lists "Data loaded: …"
 - Check the browser console (F12) for any errors
 
 ---
@@ -165,7 +165,7 @@ If you don't see this, the data loading failed on the server side.
 ### Check Browser Network Tab
 1. Open DevTools (F12)
 2. Go to **Network** tab
-3. Choose **Load data** on Setup
+3. Choose **Load data** on Start
 4. Look for `POST /load` request
 5. Check response (should show geneticCount and patientCount > 0)
 
@@ -182,7 +182,7 @@ The response should show `"modelsTrained":true` with `geneticCount` and `patient
 - [ ] Server built with `cmake --build . --config Release`
 - [ ] Server running from project root (not from build/ folder)
 - [ ] Server shows "Starting server on http://localhost:8080"
-- [ ] Server address on the Setup screen is `http://localhost:8080`
+- [ ] Server address on the Start screen (Advanced) is `http://localhost:8080`
 - [ ] CSV files exist in `data/` folder with correct headers
 - [ ] Browser console shows no errors (F12 > Console)
 - [ ] Network request shows 200 response (F12 > Network)

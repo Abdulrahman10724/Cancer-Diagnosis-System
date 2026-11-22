@@ -1,21 +1,21 @@
 # 🔬 Cancer Diagnosis System
 
-> **Cancer risk from genetic mutation scores with four machine learning models written from scratch in C++, and a React interface designed as a pathology lab bench.**
+> **Cancer risk from genetic mutation scores with four machine learning models written from scratch in C++, and a React interface that shows, step by step, what each model does.**
 
 [![C++](https://img.shields.io/badge/C++-17-blue.svg)](https://en.cppreference.com/)
 [![CMake](https://img.shields.io/badge/CMake-3.10+-green.svg)](https://cmake.org/)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Educational project — not for clinical use.**
+> **Student project — not for real medical use.**
 
-![The gel: each lane is one model; a band sinks further the higher that model puts the cancer risk](docs/screenshots/gel.png)
+![Check risk: four models each guess the chance of cancer, then a final result counts their votes](docs/screenshots/check-risk.png)
 
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
 - [Features](#-features)
-- [Design: the Pathology Bench](#-design-the-pathology-bench)
+- [Design](#-design)
 - [Tech Stack](#️-tech-stack)
 - [Getting Started](#-getting-started)
 - [Usage](#-usage)
@@ -46,58 +46,53 @@ The project has two parts:
 - 🧠 **Four models from scratch**: Logistic Regression, K-Nearest Neighbors, Decision Tree and Naive Bayes
 - 🧪 **Explained predictions**: for every model you can see the numbers behind its answer
 - 📊 **Honest evaluation**: metrics on a held-out 20% split the evaluated models never trained on
-- 🧱 **Data structures you can see**: queue as a tube rack, linked list as a chain of custody, hash table as a freezer index
+- 🧱 **Data structures you can see**: the waiting list is a queue, the patient list a linked list and the gene lookup a hash table, each animated step by step
 
 ## ✨ Features
 
-- **Gel**: run up to three patients through all four models at once; disagreement and uncertainty are visible at a glance
-- **Why drawer**: KNN neighbours, the decision-tree path, the logistic-regression formula and the Naive Bayes bell curves, all with real numbers
-- **KNN K control**: change K (1–9) for one request and watch the KNN band move
-- **Accession**: add a patient with genetic records; the models retrain with the new genes
-- **Rack**: the test queue (FIFO), processed tube by tube
-- **Report**: a printable one-page report per patient with all four verdicts and a "models disagree" flag
-- **Proficiency**: one 96-well plate per model, and a threshold dial that recomputes accuracy, precision, recall and F1
-- **Custody**: linear search through the patient linked list, node by node
-- **Freezer**: the hash table's buckets and a step-by-step trace of where a gene ID is stored
-- **Lab notebook**: a log of real events with times, exportable as `.txt`
+The app is written in plain words for people with no biology or machine-learning
+background. Every screen starts with one sentence saying what it is for, and every
+technical term has a "?" with a short explanation.
 
-## 🧫 Design: the Pathology Bench
+- **Home**: three steps (Load the data → Add or pick a patient → Check the risk), each
+  ticked off as you complete it, plus a short guided tour on the first visit
+- **Check risk** (main screen): the patient's gene scores flow into four model cards,
+  each card fills its risk bar, and the final result counts the votes ("3 of 4 models
+  say cancer"). Confidence (High / Medium / Low), a "models disagree" note, a comparison
+  chart, a KNN "how many similar genes (K)" control and side-by-side comparison of two patients
+- **Why this result?**: one animated picture per model: KNN's nearest genes voting, the
+  decision tree's yes/no questions, logistic regression's S-curve and Naive Bayes' two hills
+- **Add patient**: gene scores with sliders, a yes/no "linked to cancer?" answer and a live
+  average; the models learn from the new genes
+- **Model accuracy**: ranked accuracy, precision, recall and F1 on hidden test genes, a
+  2×2 table in words (found cancer, missed cancer, false alarm, correctly said no cancer)
+  and a "cancer line" slider that shows the trade-off
+- **Waiting list** (queue), **Patient list** (linked list) and **Gene lookup** (hash table)
+  animate how each data structure works
+- **Patient report**: one printable page (Print / Save as PDF)
+- **Activity**: a list of what happened, exportable as `.txt`
 
-The interface looks and behaves like a genetics lab bench. Every screen is a lab tool, and
-the program's data structures appear as lab objects:
+## 🎨 Design
 
-| Program | Lab object | Screen |
-|---|---|---|
-| Model predictions | Gel electrophoresis | Gel |
-| Test queue (FIFO) | Tube rack and analyzer | Rack |
-| Patient history (linked list) | Chain of custody | Custody |
-| Mutation map (hash table) | Freezer box index | Freezer |
-| Evaluation on held-out data | Proficiency test plates | Proficiency |
+A friendly, light medical-app style aimed at a first-year student or a teacher.
 
-**The gel is the one bold element.** Its vertical axis is risk: 0 (safe) at the top, 1
-(cancer) at the bottom, with a dashed threshold line at 0.5. A sharp band means the model
-is confident; a smeared band means it is unsure (band height and blur grow as the risk
-gets closer to 0.5). When a gel runs, the bands migrate from the wells to their position;
-with reduced motion turned on they simply appear in place.
-
-**Stain colors identify models only**, named after real histology stains:
-
-| Model | Stain | Light surfaces | On the gel |
-|---|---|---|---|
-| Logistic Regression | Hematoxylin | `#6A3FA0` | `#A47BE1` |
-| KNN | DAB amber | `#C98A00` | `#C48600` |
-| Decision Tree | Eosin | `#D0457E` | `#E75A91` |
-| Naive Bayes | Methylene blue | `#0089B0` | `#31A1C9` |
-
-Outcomes have their own colors (`#2E7D5B` non-cancerous, `#B3261E` cancerous) and always
-come with a word and an icon. The gel colors are lighter steps of the same hues, checked
-for color-blind separation and 3:1 contrast on the dark gel surface. Every lane, plate and
-legend also prints the model name as text, so no information depends on color alone.
-All values are in [`frontend/src/styles/tokens.css`](frontend/src/styles/tokens.css).
-
-Type is Atkinson Hyperlegible Next throughout (a typeface designed for legibility), with
-Libre Barcode 128 only on specimen labels, which carry a valid Code 128 barcode of the
-patient ID.
+- **Plain language**: screens are named for what you do (Add patient, Check risk, Model
+  accuracy). Results are sentences: "Naive Bayes thinks there is a 72% chance of cancer, so
+  it says cancer."
+- **Risk is never colour alone**: Low (green ✓, under 35%), Medium (amber !, 35–65%) and
+  High (red ▲, over 65%) always show a word and an icon. These levels are for display; a
+  model's own answer always uses the 50% cancer line.
+- **Model colours** identify models only and always appear next to the model's name:
+  Logistic Regression `#6A3FA0`, KNN `#C98A00`, Decision Tree `#D0457E`, Naive Bayes `#0089B0`.
+  The risk colours are lighter than text needs, so risk *words* use darker shades
+  (5.3:1 contrast or more); bars and icons use the bright colours.
+- **Animation explains**: when you press Check risk, the steps the system takes are shown
+  in order (reading the genes, each model deciding, the votes being counted). Every other
+  animation answers something you did. With reduced motion turned on, results appear at once.
+- **Type**: Atkinson Hyperlegible Next, a typeface designed for readability, with
+  tabular figures for numbers.
+- **Accessible**: keyboard access everywhere, visible focus, panels that trap focus and
+  close on Esc, the final result announced to screen readers, and 4.5:1 text contrast.
 
 ## 🛠️ Tech Stack
 
@@ -109,7 +104,7 @@ patient ID.
 
 ### Frontend
 - **React 18** with **Vite**, React Router
-- **framer-motion** (gel migration, drawer), **@dnd-kit/core** (drag samples onto the gel), **d3-scale** (scales only; every chart is hand-drawn SVG)
+- **framer-motion** (all animation), **d3-scale** (scales only; every chart is hand-drawn SVG), **lucide-react** (navigation icons)
 - CSS Modules and one `tokens.css`; fonts from `@fontsource`
 
 ## 🚀 Getting Started
@@ -174,11 +169,11 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (normally http://localhost:5173). On the **Setup** screen, choose
+Open the URL Vite prints (normally http://localhost:5173). On **Home**, follow step 1 and choose
 **Load data**. The server reads the CSV files and trains the four models.
 
 The frontend talks to `http://localhost:8080` by default. To use another address, change
-it on the Setup screen, or set `VITE_API_URL` before `npm run dev`.
+it on the Start screen (under Advanced), or set `VITE_API_URL` before `npm run dev`.
 
 Other scripts: `npm run build` (production build in `frontend/dist/`) and `npm run lint`.
 
@@ -186,14 +181,15 @@ For more detail and troubleshooting, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 
 ## 📖 Usage
 
-1. **Setup**: load the data (trains the models).
-2. **Accession**: add a patient with their genes. The models retrain.
-3. **Gel**: drag specimen labels onto the wells (or select one and press Enter), then
-   **Run gel**. Select a band to see why the model placed it there.
-4. **Rack**: add tubes, pick a model and **Process rack**.
-5. **Report**: open the one-page report and **Print report**.
-6. **Proficiency**, **Custody** and **Freezer**: see how accurate each model is and how the
-   data structures work.
+1. **Home** shows three steps. A short tour points at each part on the first visit.
+2. **Start**: press **Load data**. The checklist ticks off reading the files and training
+   the 4 models.
+3. **Add patient**: enter a patient and their gene scores, then **Save patient**.
+4. **Check risk**: pick a patient and press **Check risk**. Press **Why this result?** on
+   any model to see how it decided.
+5. **Model accuracy**: see how often each model is right, and move the cancer line.
+6. **Waiting list**, **Patient report**, **Patient list (linked list)** and **Gene lookup
+   (hash table)** are in the sidebar (on a phone, under **More**).
 
 ## 📁 Project Structure
 
@@ -212,9 +208,11 @@ Cancer-Diagnosis-System/
 │       ├── api/client.js      # The only place that calls the server
 │       ├── state/AppState.jsx # App state (Context + useReducer)
 │       ├── styles/            # tokens.css, global.css
-│       ├── components/        # SpecimenLabel, Band, Lane, Well, Plate, Tube, Drawer, …
-│       ├── screens/           # Setup, Accession, Rack, Gel, Report, Proficiency, Custody, Freezer
-│       └── lib/               # metrics.js, format.js, models.js, code128.js, hash.js
+│       ├── components/        # Shell (navigation), ModelCard, FinalResult, Explain, Risk, Tour, …
+│       ├── screens/           # Home, Start, AddPatient, CheckRisk, Accuracy, WaitingList,
+│       │                      # PatientReport, LinkedList, HashTable
+│       ├── hooks/useRiskRun.js # Runs Check risk and its step-by-step animation
+│       └── lib/               # metrics.js, format.js, models.js, hash.js, tour.js
 ├── docs/screenshots/
 ├── generate_genes.py          # Generates a realistic genes.csv
 ├── main.cpp                   # Optional command-line version
@@ -366,13 +364,14 @@ P001,GENE_001
 P001,GENE_002
 ```
 
-## 🎨 Screenshots
+## 📸 Screenshots
 
 | | |
 |---|---|
-| ![Why drawer for KNN: the nearest training genes and their votes](docs/screenshots/why-knn.png) | ![Report for one patient with the four verdicts](docs/screenshots/report.png) |
-| ![Proficiency plates: filled well = correct, ring = wrong](docs/screenshots/proficiency.png) | ![Custody: linear search through the linked list](docs/screenshots/custody.png) |
-| ![Freezer: hash table buckets and a key trace](docs/screenshots/freezer.png) | |
+| ![Home: three steps, each ticked off when done](docs/screenshots/home.png) | ![Add patient: gene scores with sliders and a live average](docs/screenshots/add-patient.png) |
+| ![Why this result for KNN: the most similar genes vote](docs/screenshots/why-knn.png) | ![Why this result for Logistic Regression: the S-shaped curve](docs/screenshots/why-logistic.png) |
+| ![Model accuracy: ranked bars and results in words](docs/screenshots/model-accuracy.png) | ![Patient list: searching the linked list one patient at a time](docs/screenshots/linked-list.png) |
+| ![Gene lookup: the formula jumps straight to the right box](docs/screenshots/hash-table.png) | ![Check risk on a phone](docs/screenshots/mobile-check-risk.png) |
 
 ## 📝 License
 

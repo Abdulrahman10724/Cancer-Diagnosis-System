@@ -127,12 +127,14 @@ Other frontend scripts:
 
 ### Step 5: Load Data
 
-1. The app opens on **Setup**. It shows whether the server is reachable.
-2. Choose **Load data**. The server reads `data/genes.csv`, `data/patients.csv` and
-   `data/patient_genes.csv` and trains the four models.
-3. The status shows **Trained** with the number of genes and patients, and the lab
-   notebook on the right records the event.
-4. Continue with **Accession** (add a patient) or **Gel** (run the models).
+1. The app opens on **Home** with three steps. If the server is not reachable, a red
+   banner says so.
+2. Choose **Load data** (step 1, or the **Start** screen). The server reads
+   `data/genes.csv`, `data/patients.csv` and `data/patient_genes.csv` and trains the four
+   models; a checklist ticks off each stage.
+3. The page says "Loaded … genes and … patients. All 4 models are trained." and the event is
+   listed under **Activity** (top right).
+4. Continue with **Add patient** or **Check risk**.
 
 ## 📂 Project Structure
 
@@ -154,7 +156,7 @@ Cancer-Diagnosis-System/
 │   ├── package.json
 │   └── src/
 │       ├── api/client.js     # All calls to the server
-│       ├── screens/          # Setup, Accession, Rack, Gel, Report, Proficiency, Custody, Freezer
+│       ├── screens/          # Home, Start, Add patient, Check risk, Model accuracy, Waiting list, …
 │       ├── components/       # Shared components
 │       └── styles/tokens.css # Design tokens (colors, type, spacing)
 ├── third_party/
@@ -182,8 +184,8 @@ Change `8080` to your desired port (e.g., `8081`), then rebuild the project.
 
 If you changed the server port, either:
 
-1. Open **Setup** in the web interface, enter the new address under **Server address**
-   and choose **Save and reconnect** (saved in this browser only), or
+1. Open **Start / Settings**, open **Advanced: server address**, enter the new address and
+   choose **Save and reconnect** (saved in this browser only), or
 2. Start the frontend with the address set:
    ```bash
    VITE_API_URL=http://localhost:8081 npm run dev
@@ -375,10 +377,10 @@ patient P007.
 This system includes:
 
 - **Multiple ML Models**: Decision Tree, KNN, Logistic Regression, Naive Bayes
-- **Gel**: all four models side by side, with an explanation for every prediction
+- **Check risk**: all four models side by side, with an explanation for every prediction
 - **Model Evaluation**: metrics on held-out data, with an adjustable threshold
-- **Queue System**: the test rack, processed first in, first out
-- **Data Structures**: the linked list (Custody) and hash table (Freezer) shown step by step
+- **Waiting list**: patients checked first in, first out (a queue)
+- **Data Structures**: the patient list (linked list) and gene lookup (hash table) shown step by step
 
 ## 📞 Need Help?
 
