@@ -204,6 +204,7 @@ public:
     // Data export
     std::vector<Patient> getAllPatients() const;
     std::vector<GeneticData> getAllGeneticData() const;
+    const HashMapper& getMutationMapper() const;
     void saveDataToFiles(const std::string& genesFile, const std::string& patientsFile,
                          const std::string& patientGenesFile = "data/patient_genes.csv") const;
 };

@@ -416,6 +416,32 @@ int serverMain() {
         res.set_content(ss.str(), "application/json");
     });
 
+    // GET /hashmap -> buckets of the mutation hash table (separate chaining)
+    svr.Get("/hashmap", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(systemMutex);
+        const HashMapper& map = system.getMutationMapper();
+        std::ostringstream ss;
+        ss << std::setprecision(6);
+        ss << "{\"bucketCount\":" << map.bucketCount()
+           << ",\"size\":" << map.size()
+           << ",\"loadFactor\":" << map.loadFactor()
+           << ",\"buckets\":[";
+        for (size_t i = 0; i < map.bucketCount(); ++i) {
+            if (i) ss << ",";
+            ss << "{\"index\":" << i << ",\"items\":[";
+            bool first = true;
+            for (const auto& item : map.bucketAt(i)) {
+                if (!first) ss << ",";
+                first = false;
+                ss << "{\"key\":\"" << json_escape(item.first) << "\",\"value\":" << item.second
+                   << ",\"hash\":" << HashMapper::hashKey(item.first) << "}";
+            }
+            ss << "]}";
+        }
+        ss << "]}";
+        res.set_content(ss.str(), "application/json");
+    });
+
     // GET /queue -> { queueSize: N, patients: ["P1","P2"] }
     svr.Get("/queue", [&](const httplib::Request& req, httplib::Response& res) {
         std::lock_guard<std::mutex> lock(systemMutex);

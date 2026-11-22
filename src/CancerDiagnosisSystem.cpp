@@ -842,6 +842,10 @@ std::vector<GeneticData> CancerDiagnosisSystem::getAllGeneticData() const {
     return geneticDataArray;
 }
 
+const HashMapper& CancerDiagnosisSystem::getMutationMapper() const {
+    return mutationMapper;
+}
+
 void CancerDiagnosisSystem::saveDataToFiles(const std::string& genesFile, const std::string& patientsFile,
                                             const std::string& patientGenesFile) const {
     // Save genetic data to genes file
